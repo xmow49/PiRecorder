@@ -1,0 +1,11 @@
+[Unit]
+Description=Pi Recorder
+
+[Service]
+User=root
+WorkingDirectory=/root/
+ExecStart=/root/PiRecorder.out
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
