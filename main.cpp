@@ -50,7 +50,7 @@ string generateFilename() {
     time_t t = time(NULL);
     struct tm tm = *localtime(&t);
     char name[50];
-    sprintf(name, "%02d-%02d-%d_%02d-%02d-%02d\n", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    sprintf(name, "%02d-%02d-%d_%02d-%02d-%02d.wav", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
     return name;
 }
 
@@ -58,7 +58,7 @@ bool recordState = false;
 
 void record(string soundCards[]) {
         while (recordState) {
-            string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + generateFilename() + ".wav";
+            string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + generateFilename();
             system(cmd.c_str());
         }
 }
