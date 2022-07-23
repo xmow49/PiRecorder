@@ -27,6 +27,7 @@ sudo make
 #include <time.h>
 #include <string.h>
 #include <fstream>
+#include <experimental/filesystem>
 #include <thread>
 #include <unistd.h>
 #include <iostream>
@@ -36,21 +37,65 @@ sudo make
 #include "SSD1306_OLED.h"
 
 using namespace std;
+
 string recordPath = "/mnt/records/";
+string configPath = recordPath + ".recorder";
 
 #define OLED_WIDTH 128
-#define OLED_HEIGHT 64
+#define OLED_HEIGHT 32
 
 SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object 
 
-
+inline bool exists_test1(const std::string& name) {
+    if (FILE* file = fopen(name.c_str(), "r")) {
+        fclose(file);
+        return true;
+    }
+    else {
+        return false;
+    }
+}
 
 string generateFilename() {
+    
+    unsigned long fileId;
 
-    time_t t = time(NULL);
-    struct tm tm = *localtime(&t);
-    char name[50];
-    sprintf(name, "%02d-%02d-%d_%02d-%02d-%02d.wav", tm.tm_mday, tm.tm_mon + 1, tm.tm_year + 1900, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    if (exists_test1(configPath)) {
+		cout << "config file exists" << endl;
+		ifstream configFile(configPath);
+		//read the file and split with =
+		string line;
+		while (getline(configFile, line)) {
+			stringstream ss(line);
+			string key;
+			string value;
+			getline(ss, key, '=');
+			getline(ss, value);
+			if (key == "FILEID") {
+				fileId = stoul(value);
+			}
+		}
+		configFile.close();
+    }
+	else {
+		cout << "config file does not exist" << endl;
+		ofstream configFile;
+		configFile.open(configPath);
+		configFile << "FILEID=0" << endl;
+		configFile.close();
+        fileId = 0;
+		}
+	
+    fileId++;
+	cout << "New File ID: " << fileId << endl;
+
+	ofstream configFile;
+	configFile.open(configPath);
+	configFile << "FILEID=" << fileId << endl;
+	configFile.close();
+	
+    char name[10];
+    sprintf(name, "R%06lu.wav", fileId);
     return name;
 }
 
@@ -134,7 +179,7 @@ void printTimeOLED(time_t recordStartTime, bool recordState) {
         OLED.OLEDclearBuffer(); // Clear active buffer 
         OLED.setTextColor(WHITE);
         OLED.setTextSize(2);
-        OLED.setCursor(15, 25);
+        OLED.setCursor(15, 13);
         OLED.print(text);
 
         if (recordState) {
@@ -169,19 +214,16 @@ int main(int argc, char** argv) {
 
     OLED.OLEDclearBuffer(); // Clear active buffer 
     OLED.setTextColor(WHITE);
-    OLED.setCursor(0, 0);
     OLED.setTextSize(2);
-    OLED.setCursor(55, 10);
-    OLED.print("Pi");
-    OLED.setCursor(20, 40);
-    OLED.print("Recorder");
+    OLED.setCursor(5, 13);
+    OLED.print("PiRecorder");
     OLED.OLEDupdate();  //write to active buffer
 
     usleep(2 * 1000 * 1000);
 
     std::thread recordThread;
 
-    uint8_t bouton = 16; //BCM16 --> GPIO36
+    uint8_t bouton = 27; //BCM16 --> GPIO36
 
     bcm2835_gpio_fsel(bouton, BCM2835_GPIO_FSEL_INPT);
     bcm2835_gpio_set_pud(bouton, BCM2835_GPIO_PUD_UP);
