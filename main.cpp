@@ -26,8 +26,8 @@ sudo make
 #include <sys/types.h>
 #include <time.h>
 #include <string.h>
+#include <sstream>
 #include <fstream>
-#include <experimental/filesystem>
 #include <thread>
 #include <unistd.h>
 #include <iostream>
@@ -44,9 +44,17 @@ string configPath = recordPath + ".recorder";
 #define OLED_WIDTH 128
 #define OLED_HEIGHT 32
 
+#define B_LEFT 0
+#define B_OK 1
+#define B_RIGHT 2
+
+#define MENU_INFO 0
+#define MENU_RECORD 1
+#define MENU_PLAY 2
+
 SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object 
 
-inline bool exists_test1(const std::string& name) {
+inline bool checkFileExist(const std::string& name) {
     if (FILE* file = fopen(name.c_str(), "r")) {
         fclose(file);
         return true;
@@ -60,7 +68,7 @@ string generateFilename() {
     
     unsigned long fileId;
 
-    if (exists_test1(configPath)) {
+    if (checkFileExist(configPath)) {
 		cout << "config file exists" << endl;
 		ifstream configFile(configPath);
 		//read the file and split with =
@@ -71,6 +79,7 @@ string generateFilename() {
 			string value;
 			getline(ss, key, '=');
 			getline(ss, value);
+
 			if (key == "FILEID") {
 				fileId = stoul(value);
 			}
@@ -101,9 +110,11 @@ string generateFilename() {
 
 bool recordState = false;
 
-void record(string soundCards[]) {
+void record(string soundCards[], string* filenameOUT) {
         while (recordState) {
-            string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + generateFilename();
+            string filename = generateFilename();
+            *filenameOUT = filename;
+            string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
             system(cmd.c_str());
         }
 }
@@ -129,12 +140,16 @@ std::string exec(const char* cmd) {
 void getSoundCard(string strCardList[]) {
     string result = exec("arecord -l");
     string line;
-    int cardIndex = 0;
+	int cardIndex = 0;
+    if (result.empty()) {
+        printf("No Sound Card\n");
+        strCardList[0] = "-1";
+        return;
+    }
     for (int i = 0; i < (int)result.length(); i++) {
         if (result[i] == 10) {
-            //new line
-            int find = line.find("card");
-            if (find != -1) {
+			//new line
+            if (line.find("card") != -1) {
                 strCardList[cardIndex] = line[5]; //get the card id
                 cardIndex++;
                 printf("CARD: %c\n", line[5]);
@@ -144,6 +159,7 @@ void getSoundCard(string strCardList[]) {
         else {
             line += result[i];
         }
+
     }
 }
 
@@ -157,7 +173,7 @@ void setupOLED() {
 
 }
 
-void printTimeOLED(time_t recordStartTime, bool recordState) {
+void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
     time_t now = time(nullptr);
     static time_t lastRefreshTime;
 
@@ -181,11 +197,12 @@ void printTimeOLED(time_t recordStartTime, bool recordState) {
         OLED.setTextSize(2);
         OLED.setCursor(15, 13);
         OLED.print(text);
-
         if (recordState) {
             OLED.setTextSize(1);
             OLED.setCursor(0, 0);
             OLED.print("REC");
+            OLED.setCursor(30, 0);
+            OLED.print(filename.c_str());
         }
         OLED.OLEDupdate();
     }
@@ -199,16 +216,18 @@ void stopProgram(int signal_number) {
 }
 
 
+void readButtonsStates(const uint8_t buttonsPins[], bool buttonsStates[]) {
+    for (uint i = 0; i < (sizeof(buttonsPins) / sizeof(*buttonsPins)); i++) {
+        buttonsStates [i] = bcm2835_gpio_lev(buttonsPins[i]);
+    }
+}
+
+
 int main(int argc, char** argv) {
     signal(SIGINT, stopProgram);
-
+    signal(SIGTERM, stopProgram);
     printf("Pi Recorder\n");
-
-    string soundCards[10];
-    getSoundCard(soundCards);
-
     setupOLED();
-    
     uint8_t screenBuffer[OLED_WIDTH * (OLED_HEIGHT / 8) + 1];
     OLED.buffer = (uint8_t*)&screenBuffer;  // set that to library buffer pointer
 
@@ -223,39 +242,121 @@ int main(int argc, char** argv) {
 
     std::thread recordThread;
 
+    uint8_t buttons[3] = { 26,27,28 };
     uint8_t bouton = 27; //BCM16 --> GPIO36
 
-    bcm2835_gpio_fsel(bouton, BCM2835_GPIO_FSEL_INPT);
-    bcm2835_gpio_set_pud(bouton, BCM2835_GPIO_PUD_UP);
+    for (uint i = 0; i < 3; i++) {
+        bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
+        bcm2835_gpio_set_pud(buttons[i], BCM2835_GPIO_PUD_UP);
+        printf("%d\n", buttons[i]);
+    }
+    
 
-    bool boutonState, boutonStateOLD;
+    string soundCards[10];
+    getSoundCard(soundCards);
 
-    boutonState = bcm2835_gpio_lev(bouton);
-    boutonStateOLD = boutonState;
+    while (soundCards[0] == "-1") {        
+        OLED.OLEDclearBuffer();
+        OLED.setTextSize(2);
+        OLED.setCursor(20, 0);
+        OLED.print("Error");
+        OLED.setTextSize(1);
+        OLED.setCursor(0, 15);
+        OLED.print("No SoundCard deteced!");
+        OLED.setCursor(0, 24);
+        OLED.print("Press to retry");
+        OLED.OLEDupdate();
+        bool retry = false;
+        while (!retry) {
+            bool state[3];
+            readButtonsStates(buttons, state);
+            if (state[B_OK] == 0 || state[B_LEFT] == 0 || state[B_RIGHT] == 0) { //button pressed
+                OLED.OLEDclearBuffer();
+                OLED.setTextSize(2);
+                OLED.setCursor(20, 13);
+                OLED.print("Retry...");
+                OLED.OLEDupdate();
+                getSoundCard(soundCards);
+                retry = true;
+                usleep(500 * 1000);
+            }
+        }
+    }
+
 
     time_t recordStartTime = 0;
+
+    bool buttonsStates[3] = { 1 , 1 , 1 };
+    bool previousBoutonsStates[3] = {1 , 1 , 1};
+
+    uint8_t displayMenu = 1; 
     while (mainLoop) {
-        boutonState = bcm2835_gpio_lev(bouton);
-        if (boutonState != boutonStateOLD) {
-            boutonStateOLD = boutonState;
-            if (boutonState == 0) { //button push
-                recordState = !recordState;
-                if (recordState) {
-                    printf("start Recording\n");
-                    recordThread = std::thread(record, soundCards);
-                    recordStartTime = std::time(nullptr);
+        readButtonsStates(buttons, buttonsStates);
+        static string currentFilename = "";
+        for (uint i = 0; i < 3; i++) {
+            if (buttonsStates[i] != previousBoutonsStates[i]) {
+                //new State
+                if (buttonsStates[i] == 0) {
+                    //button pushed
+
+                    switch (i)
+                    {
+                    case B_LEFT:
+                        displayMenu = displayMenu > 0 ? --displayMenu : displayMenu;
+                        break;
+
+                    case B_OK:
+                        recordState = !recordState;
+                        if (recordState) {
+                            printf("start Recording\n");
+                            recordThread = std::thread(record, soundCards, &currentFilename);
+                            recordStartTime = std::time(nullptr);
+                        }
+                        else {
+                            printf("stop Recording\n");
+                            system("killall arecord");
+                            recordThread.join();
+                            recordStartTime = 0;
+                        }
+                        break;
+
+                    case B_RIGHT:
+                        displayMenu = displayMenu < 2 ? ++displayMenu : displayMenu;
+                        break;
+                    default:
+                        break;
+                    }
+                    
                 }
-                else {
-                    printf("stop Recording\n");
-                    system("killall arecord");
-                    recordThread.join();
-                    recordStartTime = 0;
-                }
+                usleep(50 * 1000);
+                previousBoutonsStates[i] = buttonsStates[i];
             }
-            usleep(50 * 1000);
         }
-        printTimeOLED(recordStartTime, recordState);
-        usleep(100 * 1000);
+
+        
+        switch (displayMenu)
+        {
+        case MENU_INFO:
+            OLED.OLEDclearBuffer();
+            OLED.setCursor(15, 0);
+            OLED.setTextSize(2);
+            OLED.print("INFO");
+            OLED.OLEDupdate();
+            break;
+        case MENU_RECORD:
+            printTimeOLED(recordStartTime, recordState, currentFilename);
+            break;
+        case MENU_PLAY:
+            OLED.OLEDclearBuffer();
+            OLED.setCursor(15, 0);
+            OLED.setTextSize(2);
+            OLED.print("PLAY");
+            OLED.OLEDupdate();
+            break;
+        default:
+            break;
+        }
+        usleep(10 * 1000);
     }
 
     OLED.OLEDclearBuffer(); // Clear active buffer 
