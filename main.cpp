@@ -35,6 +35,12 @@ sudo make
 #include <stdexcept>
 #include <bcm2835.h>
 #include "SSD1306_OLED.h"
+#include <sys/types.h>
+#include <ifaddrs.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/statvfs.h>
 
 using namespace std;
 
@@ -53,6 +59,36 @@ string configPath = recordPath + ".recorder";
 #define MENU_PLAY 2
 
 SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object 
+
+
+
+
+
+string getIPAddress() {
+    string ipAddress = "Unable to get IP Address";
+    struct ifaddrs* interfaces = NULL;
+    struct ifaddrs* temp_addr = NULL;
+    int success = 0;
+    // retrieve the current interfaces - returns 0 on success
+    success = getifaddrs(&interfaces);
+    if (success == 0) {
+        // Loop through linked list of interfaces
+        temp_addr = interfaces;
+        while (temp_addr != NULL) {
+            if (temp_addr->ifa_addr->sa_family == AF_INET) {
+                // Check if interface is en0 which is the wifi connection on the iPhone
+                if (strcmp(temp_addr->ifa_name, "en0")) {
+                    ipAddress = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
+                }
+            }
+            temp_addr = temp_addr->ifa_next;
+        }
+    }
+    // Free memory
+    freeifaddrs(interfaces);
+    return ipAddress;
+}
+
 
 inline bool checkFileExist(const std::string& name) {
     if (FILE* file = fopen(name.c_str(), "r")) {
@@ -86,37 +122,37 @@ string generateFilename() {
 		}
 		configFile.close();
     }
-	else {
-		cout << "config file does not exist" << endl;
-		ofstream configFile;
-		configFile.open(configPath);
-		configFile << "FILEID=0" << endl;
-		configFile.close();
-        fileId = 0;
-		}
-	
-    fileId++;
-	cout << "New File ID: " << fileId << endl;
+    else {
+    cout << "config file does not exist" << endl;
+    ofstream configFile;
+    configFile.open(configPath);
+    configFile << "FILEID=0" << endl;
+    configFile.close();
+    fileId = 0;
+        }
 
-	ofstream configFile;
-	configFile.open(configPath);
-	configFile << "FILEID=" << fileId << endl;
-	configFile.close();
-	
-    char name[10];
-    sprintf(name, "R%06lu.wav", fileId);
-    return name;
+        fileId++;
+        cout << "New File ID: " << fileId << endl;
+
+        ofstream configFile;
+        configFile.open(configPath);
+        configFile << "FILEID=" << fileId << endl;
+        configFile.close();
+
+        char name[10];
+        sprintf(name, "R%06lu.wav", fileId);
+        return name;
 }
 
 bool recordState = false;
 
 void record(string soundCards[], string* filenameOUT) {
-        while (recordState) {
-            string filename = generateFilename();
-            *filenameOUT = filename;
-            string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
-            system(cmd.c_str());
-        }
+    while (recordState) {
+        string filename = generateFilename();
+        *filenameOUT = filename;
+        string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
+        system(cmd.c_str());
+    }
 }
 
 std::string exec(const char* cmd) {
@@ -140,7 +176,7 @@ std::string exec(const char* cmd) {
 void getSoundCard(string strCardList[]) {
     string result = exec("arecord -l");
     string line;
-	int cardIndex = 0;
+    int cardIndex = 0;
     if (result.empty()) {
         printf("No Sound Card\n");
         strCardList[0] = "-1";
@@ -148,7 +184,7 @@ void getSoundCard(string strCardList[]) {
     }
     for (int i = 0; i < (int)result.length(); i++) {
         if (result[i] == 10) {
-			//new line
+            //new line
             if (line.find("card") != -1) {
                 strCardList[cardIndex] = line[5]; //get the card id
                 cardIndex++;
@@ -162,6 +198,48 @@ void getSoundCard(string strCardList[]) {
 
     }
 }
+
+string humanReadable(long long size) {
+	string suffixes[] = { "B", "KB", "MB", "GB", "TB" };
+	int i = 0;
+	while (size >= 1000) {
+		size /= 1000;
+		i++;
+	}
+	return to_string(size) + suffixes[i];
+}
+
+void readSpace(string path, long long *used, long long *size) {
+    string result = exec("/bin/df");
+    stringstream ss(result);
+    string line;
+
+    string cmdValues[6];
+    int cmdIndex = 0;
+
+    while (getline(ss, line)) { //for each line
+        //cout << "Line: " << line << endl;
+        stringstream key(line);
+        string keyValue;
+        cmdIndex = 0;
+        cmdValues->clear();
+        while (getline(key, keyValue, ' ')) { //for each info (split by spaces)
+            if (keyValue != "") { // If it is a value
+                //cout << "Value: " << keyValue << endl;
+                cmdValues[cmdIndex] = keyValue;
+                cmdIndex++;
+            }
+        }
+        if (cmdValues[5] == path.substr(0, path.size() - 1)){
+            /*for (int i = 0; i < 6; i++) {
+                cout << i << ": \"" << cmdValues[i] << "\"" << endl;
+            }*/
+            *used = stoll(cmdValues[2]) * 1000;
+            *size = stoll(cmdValues[1]) * 1000;
+        }
+    }
+}
+
 
 void setupOLED() {
     if (!bcm2835_init())
@@ -223,6 +301,38 @@ void readButtonsStates(const uint8_t buttonsPins[], bool buttonsStates[]) {
 }
 
 
+void printInfo(string updateIP = "", long long updateUsed = 0, long long updateSize = 0) {
+    static string ip = "";
+    static long long used = 0;
+    static long long size = 0;
+    if (updateIP != "") {
+        ip = updateIP;
+    }
+    if (updateUsed != 0) {
+        used = updateUsed;
+    }
+    if (updateSize != 0) {
+        size = updateSize;
+    }
+
+    OLED.OLEDclearBuffer();
+    OLED.setCursor(0, 0);
+    OLED.setTextSize(2);
+    OLED.print("INFO");
+
+    OLED.setTextSize(1);
+    OLED.setCursor(0, 15);
+    OLED.print(ip.c_str());
+
+    OLED.setCursor(0, 24);
+    char space[50];
+    sprintf(space, "%s/%s", humanReadable(used).c_str(), humanReadable(size).c_str());
+
+    OLED.print(space);
+
+    OLED.OLEDupdate();
+}
+
 int main(int argc, char** argv) {
     signal(SIGINT, stopProgram);
     signal(SIGTERM, stopProgram);
@@ -238,19 +348,16 @@ int main(int argc, char** argv) {
     OLED.print("PiRecorder");
     OLED.OLEDupdate();  //write to active buffer
 
-    usleep(2 * 1000 * 1000);
+    usleep(1 * 1000 * 1000);
 
     std::thread recordThread;
 
-    uint8_t buttons[3] = { 26,27,28 };
-    uint8_t bouton = 27; //BCM16 --> GPIO36
+    uint8_t buttons[3] = { 17,27,22 };
 
     for (uint i = 0; i < 3; i++) {
         bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
         bcm2835_gpio_set_pud(buttons[i], BCM2835_GPIO_PUD_UP);
-        printf("%d\n", buttons[i]);
     }
-    
 
     string soundCards[10];
     getSoundCard(soundCards);
@@ -297,13 +404,21 @@ int main(int argc, char** argv) {
             if (buttonsStates[i] != previousBoutonsStates[i]) {
                 //new State
                 if (buttonsStates[i] == 0) {
+                    cout << "Menu: " << +displayMenu << endl;
                     //button pushed
 
                     switch (i)
                     {
                     case B_LEFT:
+                    {
                         displayMenu = displayMenu > 0 ? --displayMenu : displayMenu;
+                        string ip = "IP:" + getIPAddress();
+                        long long used, size;
+                        readSpace(recordPath, &used, &size);
+                        cout << used << "/" << size << endl;
+                        printInfo(ip, used, size);
                         break;
+                    }
 
                     case B_OK:
                         recordState = !recordState;
@@ -337,12 +452,10 @@ int main(int argc, char** argv) {
         switch (displayMenu)
         {
         case MENU_INFO:
-            OLED.OLEDclearBuffer();
-            OLED.setCursor(15, 0);
-            OLED.setTextSize(2);
-            OLED.print("INFO");
-            OLED.OLEDupdate();
+        {
+            printInfo();
             break;
+		}
         case MENU_RECORD:
             printTimeOLED(recordStartTime, recordState, currentFilename);
             break;
