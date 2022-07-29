@@ -94,16 +94,23 @@
     <LibraryPath>/usr/local/include</LibraryPath>
   </PropertyGroup>
   <ItemGroup>
+    <ClCompile Include="alsa.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="oled.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="pi-recorder.service" />
     <Text Include="service.sh" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="alsa.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="oled.h" />
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
-      <LibraryDependencies>pthread;bcm2835;rt;SSD1306_OLED_RPI</LibraryDependencies>
-      <AdditionalLibraryDirectories>/usr/local/include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <LibraryDependencies>pthread;bcm2835;rt;SSD1306_OLED_RPI;asound</LibraryDependencies>
+      <AdditionalLibraryDirectories>/usr/local/include;/usr/include/alsa/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,7 +1,7 @@
 /*
 
 
-for visual studio: sudo apt-get install openssh-server g++ gdb make ninja-build rsync zip
+for visual studio: sudo apt-get install openssh-server g++ gdb make ninja-build rsync zip libasound2-dev
 
 wget http://www.airspayce.com/mikem/bcm2835/bcm2835-1.71.tar.gz
 tar zxvf bcm2835-1.71.tar.gz
@@ -20,7 +20,6 @@ sudo make
 
 */
 
-
 #include <stdio.h>
 #include <signal.h>
 #include <sys/types.h>
@@ -34,7 +33,6 @@ sudo make
 #include <chrono>
 #include <stdexcept>
 #include <bcm2835.h>
-#include "SSD1306_OLED.h"
 #include <sys/types.h>
 #include <ifaddrs.h>
 #include <sys/socket.h>
@@ -42,69 +40,58 @@ sudo make
 #include <arpa/inet.h>
 #include <sys/statvfs.h>
 
+#include "oled.h"
+#include "config.h"
+#include "alsa.h"
+
+
 using namespace std;
 
 string recordPath = "/mnt/records/";
 string configPath = recordPath + ".recorder";
 
-#define OLED_WIDTH 128
-#define OLED_HEIGHT 32
-
-#define B_LEFT 0
-#define B_OK 1
-#define B_RIGHT 2
-
-#define MENU_INFO 0
-#define MENU_RECORD 1
-#define MENU_PLAY 2
-
-SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object 
-
-
-
-
 
 string getIPAddress() {
-    string ipAddress = "Unable to get IP Address";
-    struct ifaddrs* interfaces = NULL;
-    struct ifaddrs* temp_addr = NULL;
-    int success = 0;
-    // retrieve the current interfaces - returns 0 on success
-    success = getifaddrs(&interfaces);
-    if (success == 0) {
-        // Loop through linked list of interfaces
-        temp_addr = interfaces;
-        while (temp_addr != NULL) {
-            if (temp_addr->ifa_addr->sa_family == AF_INET) {
-                // Check if interface is en0 which is the wifi connection on the iPhone
-                if (strcmp(temp_addr->ifa_name, "en0")) {
-                    ipAddress = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
-                }
-            }
-            temp_addr = temp_addr->ifa_next;
-        }
-    }
-    // Free memory
-    freeifaddrs(interfaces);
-    return ipAddress;
+	string ipAddress = "Unable to get IP Address";
+	struct ifaddrs* interfaces = NULL;
+	struct ifaddrs* temp_addr = NULL;
+	int success = 0;
+	// retrieve the current interfaces - returns 0 on success
+	success = getifaddrs(&interfaces);
+	if (success == 0) {
+		// Loop through linked list of interfaces
+		temp_addr = interfaces;
+		while (temp_addr != NULL) {
+			if (temp_addr->ifa_addr->sa_family == AF_INET) {
+				// Check if interface is en0 which is the wifi connection on the iPhone
+				if (strcmp(temp_addr->ifa_name, "en0")) {
+					ipAddress = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
+				}
+			}
+			temp_addr = temp_addr->ifa_next;
+		}
+	}
+	// Free memory
+	freeifaddrs(interfaces);
+	return ipAddress;
 }
 
 
 inline bool checkFileExist(const std::string& name) {
-    if (FILE* file = fopen(name.c_str(), "r")) {
-        fclose(file);
-        return true;
-    }
-    else {
-        return false;
-    }
+	if (FILE* file = fopen(name.c_str(), "r")) {
+		fclose(file);
+		return true;
+	}
+	else {
+		return false;
+	}
 }
 
 string generateFilename() {
-    
-    unsigned long fileId;
 
-    if (checkFileExist(configPath)) {
+	unsigned long fileId;
+
+	if (checkFileExist(configPath)) {
 		cout << "config file exists" << endl;
 		ifstream configFile(configPath);
 		//read the file and split with =
@@ -121,363 +108,248 @@ string generateFilename() {
 			}
 		}
 		configFile.close();
-    }
-    else {
-    cout << "config file does not exist" << endl;
-    ofstream configFile;
-    configFile.open(configPath);
-    configFile << "FILEID=0" << endl;
-    configFile.close();
-    fileId = 0;
-        }
+	}
+	else {
+		cout << "config file does not exist" << endl;
+		ofstream configFile;
+		configFile.open(configPath);
+		configFile << "FILEID=0" << endl;
+		configFile.close();
+		fileId = 0;
+	}
 
-        fileId++;
-        cout << "New File ID: " << fileId << endl;
+	fileId++;
+	cout << "New File ID: " << fileId << endl;
 
-        ofstream configFile;
-        configFile.open(configPath);
-        configFile << "FILEID=" << fileId << endl;
-        configFile.close();
+	ofstream configFile;
+	configFile.open(configPath);
+	configFile << "FILEID=" << fileId << endl;
+	configFile.close();
 
-        char name[10];
-        sprintf(name, "R%06lu.wav", fileId);
-        return name;
+	char name[10];
+	sprintf(name, "R%06lu.wav", fileId);
+	return name;
 }
 
 bool recordState = false;
 
 void record(string soundCards[], string* filenameOUT) {
-    while (recordState) {
-        string filename = generateFilename();
-        *filenameOUT = filename;
-        string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
-        system(cmd.c_str());
-    }
+	while (recordState) {
+		string filename = generateFilename();
+		*filenameOUT = filename;
+		string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
+		system(cmd.c_str());
+	}
 }
 
 std::string exec(const char* cmd) {
-    char buffer[128];
-    std::string result = "";
-    FILE* pipe = popen(cmd, "r");
-    if (!pipe) throw std::runtime_error("popen() failed!");
-    try {
-        while (fgets(buffer, sizeof buffer, pipe) != NULL) {
-            result += buffer;
-        }
-    }
-    catch (...) {
-        pclose(pipe);
-        throw;
-    }
-    pclose(pipe);
-    return result;
+	char buffer[128];
+	std::string result = "";
+	FILE* pipe = popen(cmd, "r");
+	if (!pipe) throw std::runtime_error("popen() failed!");
+	try {
+		while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+			result += buffer;
+		}
+	}
+	catch (...) {
+		pclose(pipe);
+		throw;
+	}
+	pclose(pipe);
+	return result;
 }
 
 void getSoundCard(string strCardList[]) {
-    string result = exec("arecord -l");
-    string line;
-    int cardIndex = 0;
-    if (result.empty()) {
-        printf("No Sound Card\n");
-        strCardList[0] = "-1";
-        return;
-    }
-    for (int i = 0; i < (int)result.length(); i++) {
-        if (result[i] == 10) {
-            //new line
-            if (line.find("card") != -1) {
-                strCardList[cardIndex] = line[5]; //get the card id
-                cardIndex++;
-                printf("CARD: %c\n", line[5]);
-            }
-            line = "";
-        }
-        else {
-            line += result[i];
-        }
-
-    }
-}
-
-string humanReadable(long long size) {
-	string suffixes[] = { "B", "KB", "MB", "GB", "TB" };
-	int i = 0;
-	while (size >= 1000) {
-		size /= 1000;
-		i++;
+	string result = exec("arecord -l");
+	string line;
+	int cardIndex = 0;
+	if (result.empty()) {
+		printf("No Sound Card\n");
+		strCardList[0] = "-1";
+		return;
 	}
-	return to_string(size) + suffixes[i];
-}
+	for (int i = 0; i < (int)result.length(); i++) {
+		if (result[i] == 10) {
+			//new line
+			if (line.find("card") != string::npos) {
+				strCardList[cardIndex] = line[5]; //get the card id
+				cardIndex++;
+				printf("CARD: %c\n", line[5]);
+			}
+			line = "";
+		}
+		else {
+			line += result[i];
+		}
 
-void readSpace(string path, long long *used, long long *size) {
-    string result = exec("/bin/df");
-    stringstream ss(result);
-    string line;
-
-    string cmdValues[6];
-    int cmdIndex = 0;
-
-    while (getline(ss, line)) { //for each line
-        //cout << "Line: " << line << endl;
-        stringstream key(line);
-        string keyValue;
-        cmdIndex = 0;
-        cmdValues->clear();
-        while (getline(key, keyValue, ' ')) { //for each info (split by spaces)
-            if (keyValue != "") { // If it is a value
-                //cout << "Value: " << keyValue << endl;
-                cmdValues[cmdIndex] = keyValue;
-                cmdIndex++;
-            }
-        }
-        if (cmdValues[5] == path.substr(0, path.size() - 1)){
-            /*for (int i = 0; i < 6; i++) {
-                cout << i << ": \"" << cmdValues[i] << "\"" << endl;
-            }*/
-            *used = stoll(cmdValues[2]) * 1000;
-            *size = stoll(cmdValues[1]) * 1000;
-        }
-    }
+	}
 }
 
 
-void setupOLED() {
-    if (!bcm2835_init())
-    {
-        printf("Error 1201: init bcm2835 library\r\n");
-    }
 
-    OLED.OLEDbegin(); // initialize the OLED
+void readSpace(string path, long long* used, long long* size) {
+	string result = exec("/bin/df");
+	stringstream ss(result);
+	string line;
 
-}
+	string cmdValues[6];
+	int cmdIndex = 0;
 
-void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
-    time_t now = time(nullptr);
-    static time_t lastRefreshTime;
-
-    if (now != lastRefreshTime) { //every second
-        lastRefreshTime = now;
-        char text[15];
-        if (recordStartTime == 0) {
-            sprintf(text, "00:00:00");
-        }
-        else {
-            time_t time = now - recordStartTime;
-
-            long int hour = time / 60 / 60;
-            long int minutes = time / 60;
-            long int second = time - hour * 60 * 60 - minutes * 60;
-
-            sprintf(text, "%02d:%02d:%02d", hour, minutes, second);
-        }
-        OLED.OLEDclearBuffer(); // Clear active buffer 
-        OLED.setTextColor(WHITE);
-        OLED.setTextSize(2);
-        OLED.setCursor(15, 13);
-        OLED.print(text);
-        if (recordState) {
-            OLED.setTextSize(1);
-            OLED.setCursor(0, 0);
-            OLED.print("REC");
-            OLED.setCursor(30, 0);
-            OLED.print(filename.c_str());
-        }
-        OLED.OLEDupdate();
-    }
+	while (getline(ss, line)) { //for each line
+		//cout << "Line: " << line << endl;
+		stringstream key(line);
+		string keyValue;
+		cmdIndex = 0;
+		cmdValues->clear();
+		while (getline(key, keyValue, ' ')) { //for each info (split by spaces)
+			if (keyValue != "") { // If it is a value
+				//cout << "Value: " << keyValue << endl;
+				cmdValues[cmdIndex] = keyValue;
+				cmdIndex++;
+			}
+		}
+		if (cmdValues[5] == path.substr(0, path.size() - 1)) {
+			/*for (int i = 0; i < 6; i++) {
+				cout << i << ": \"" << cmdValues[i] << "\"" << endl;
+			}*/
+			*used = stoll(cmdValues[2]) * 1000;
+			*size = stoll(cmdValues[1]) * 1000;
+		}
+	}
 }
 
 bool mainLoop = true;
 void stopProgram(int signal_number) {
-    recordState = false;
-    system("killall arecord");
-    mainLoop = false;
+	recordState = false;
+	system("killall arecord");
+	mainLoop = false;
 }
 
 
 void readButtonsStates(const uint8_t buttonsPins[], bool buttonsStates[]) {
-    for (uint i = 0; i < (sizeof(buttonsPins) / sizeof(*buttonsPins)); i++) {
-        buttonsStates [i] = bcm2835_gpio_lev(buttonsPins[i]);
-    }
+	for (uint i = 0; i < 3; i++) {
+		buttonsStates[i] = bcm2835_gpio_lev(buttonsPins[i]);
+	}
 }
 
-
-void printInfo(string updateIP = "", long long updateUsed = 0, long long updateSize = 0) {
-    static string ip = "";
-    static long long used = 0;
-    static long long size = 0;
-    if (updateIP != "") {
-        ip = updateIP;
-    }
-    if (updateUsed != 0) {
-        used = updateUsed;
-    }
-    if (updateSize != 0) {
-        size = updateSize;
-    }
-
-    OLED.OLEDclearBuffer();
-    OLED.setCursor(0, 0);
-    OLED.setTextSize(2);
-    OLED.print("INFO");
-
-    OLED.setTextSize(1);
-    OLED.setCursor(0, 15);
-    OLED.print(ip.c_str());
-
-    OLED.setCursor(0, 24);
-    char space[50];
-    sprintf(space, "%s/%s", humanReadable(used).c_str(), humanReadable(size).c_str());
-
-    OLED.print(space);
-
-    OLED.OLEDupdate();
-}
 
 int main(int argc, char** argv) {
-    signal(SIGINT, stopProgram);
-    signal(SIGTERM, stopProgram);
-    printf("Pi Recorder\n");
-    setupOLED();
-    uint8_t screenBuffer[OLED_WIDTH * (OLED_HEIGHT / 8) + 1];
-    OLED.buffer = (uint8_t*)&screenBuffer;  // set that to library buffer pointer
+	signal(SIGINT, stopProgram);
+	signal(SIGTERM, stopProgram);
+	printf("Pi Recorder\n");
+	setupOLED();
 
-    OLED.OLEDclearBuffer(); // Clear active buffer 
-    OLED.setTextColor(WHITE);
-    OLED.setTextSize(2);
-    OLED.setCursor(5, 13);
-    OLED.print("PiRecorder");
-    OLED.OLEDupdate();  //write to active buffer
+	std::thread recordThread;
 
-    usleep(1 * 1000 * 1000);
+	uint8_t buttons[3] = { 17,27,22 };
 
-    std::thread recordThread;
+	for (uint i = 0; i < 3; i++) {
+		bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
+		bcm2835_gpio_set_pud(buttons[i], BCM2835_GPIO_PUD_UP);
+	}
 
-    uint8_t buttons[3] = { 17,27,22 };
+	string soundCards[10];
+	getSoundCard(soundCards);
 
-    for (uint i = 0; i < 3; i++) {
-        bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
-        bcm2835_gpio_set_pud(buttons[i], BCM2835_GPIO_PUD_UP);
-    }
-
-    string soundCards[10];
-    getSoundCard(soundCards);
-
-    while (soundCards[0] == "-1") {        
-        OLED.OLEDclearBuffer();
-        OLED.setTextSize(2);
-        OLED.setCursor(20, 0);
-        OLED.print("Error");
-        OLED.setTextSize(1);
-        OLED.setCursor(0, 15);
-        OLED.print("No SoundCard deteced!");
-        OLED.setCursor(0, 24);
-        OLED.print("Press to retry");
-        OLED.OLEDupdate();
-        bool retry = false;
-        while (!retry) {
-            bool state[3];
-            readButtonsStates(buttons, state);
-            if (state[B_OK] == 0 || state[B_LEFT] == 0 || state[B_RIGHT] == 0) { //button pressed
-                OLED.OLEDclearBuffer();
-                OLED.setTextSize(2);
-                OLED.setCursor(20, 13);
-                OLED.print("Retry...");
-                OLED.OLEDupdate();
-                getSoundCard(soundCards);
-                retry = true;
-                usleep(500 * 1000);
-            }
-        }
-    }
-
-
-    time_t recordStartTime = 0;
-
-    bool buttonsStates[3] = { 1 , 1 , 1 };
-    bool previousBoutonsStates[3] = {1 , 1 , 1};
-
-    uint8_t displayMenu = 1; 
-    while (mainLoop) {
-        readButtonsStates(buttons, buttonsStates);
-        static string currentFilename = "";
-        for (uint i = 0; i < 3; i++) {
-            if (buttonsStates[i] != previousBoutonsStates[i]) {
-                //new State
-                if (buttonsStates[i] == 0) {
-                    cout << "Menu: " << +displayMenu << endl;
-                    //button pushed
-
-                    switch (i)
-                    {
-                    case B_LEFT:
-                    {
-                        displayMenu = displayMenu > 0 ? --displayMenu : displayMenu;
-                        string ip = "IP:" + getIPAddress();
-                        long long used, size;
-                        readSpace(recordPath, &used, &size);
-                        cout << used << "/" << size << endl;
-                        printInfo(ip, used, size);
-                        break;
-                    }
-
-                    case B_OK:
-                        recordState = !recordState;
-                        if (recordState) {
-                            printf("start Recording\n");
-                            recordThread = std::thread(record, soundCards, &currentFilename);
-                            recordStartTime = std::time(nullptr);
-                        }
-                        else {
-                            printf("stop Recording\n");
-                            system("killall arecord");
-                            recordThread.join();
-                            recordStartTime = 0;
-                        }
-                        break;
-
-                    case B_RIGHT:
-                        displayMenu = displayMenu < 2 ? ++displayMenu : displayMenu;
-                        break;
-                    default:
-                        break;
-                    }
-                    
-                }
-                usleep(50 * 1000);
-                previousBoutonsStates[i] = buttonsStates[i];
-            }
-        }
-
-        
-        switch (displayMenu)
-        {
-        case MENU_INFO:
-        {
-            printInfo();
-            break;
+	while (soundCards[0] == "-1") {
+		printSoundCardError();
+		bool retry = false;
+		while (!retry) {
+			bool state[3];
+			readButtonsStates(buttons, state);
+			if (state[B_OK] == 0 || state[B_LEFT] == 0 || state[B_RIGHT] == 0) { //button pressed
+				printSoundCardRetry();
+				getSoundCard(soundCards);
+				retry = true;
+				usleep(500 * 1000);
+			}
 		}
-        case MENU_RECORD:
-            printTimeOLED(recordStartTime, recordState, currentFilename);
-            break;
-        case MENU_PLAY:
-            OLED.OLEDclearBuffer();
-            OLED.setCursor(15, 0);
-            OLED.setTextSize(2);
-            OLED.print("PLAY");
-            OLED.OLEDupdate();
-            break;
-        default:
-            break;
-        }
-        usleep(10 * 1000);
-    }
+	}
 
-    OLED.OLEDclearBuffer(); // Clear active buffer 
-    OLED.OLEDupdate();  //write to active buffer
-    recordThread.detach();
-    OLED.OLEDPowerDown(); //Switch off display
-    bcm2835_close(); // Close the library
-    return 0;
+
+	time_t recordStartTime = 0;
+
+	bool buttonsStates[3] = { 1 , 1 , 1 };
+	bool previousBoutonsStates[3] = { 1 , 1 , 1 };
+
+	char displayMenu = 1;
+	while (mainLoop) {
+		readButtonsStates(buttons, buttonsStates);
+		static string currentFilename = "";
+		for (uint i = 0; i < 3; i++) {
+			if (buttonsStates[i] != previousBoutonsStates[i]) {
+				//new State
+				if (buttonsStates[i] == 0) {
+					cout << "Menu: " << +displayMenu << endl;
+					//button pushed
+
+					switch (i)
+					{
+					case B_LEFT:
+					{
+						displayMenu = displayMenu > 0 ? --displayMenu : displayMenu;
+						string ip = "IP:" + getIPAddress();
+						long long used, size;
+						readSpace(recordPath, &used, &size);
+						cout << used << "/" << size << endl;
+						printInfo(ip, used, size);
+						break;
+					}
+
+					case B_OK:
+						recordState = !recordState;
+						if (recordState) {
+							printf("start Recording\n");
+							recordThread = std::thread(record, soundCards, &currentFilename);
+							recordStartTime = std::time(nullptr);
+						}
+						else {
+							printf("stop Recording\n");
+							system("killall arecord");
+							recordThread.join();
+							recordStartTime = 0;
+						}
+						break;
+
+					case B_RIGHT: {
+						displayMenu = displayMenu < 2 ? ++displayMenu : displayMenu;
+						alsa_play("/mnt/records/R000265.wav");
+						
+						break;
+					}
+
+					default:
+						break;
+					}
+
+				}
+				usleep(50 * 1000);
+				previousBoutonsStates[i] = buttonsStates[i];
+			}
+		}
+
+
+		switch (displayMenu)
+		{
+		case MENU_INFO:
+		{
+			printInfo();
+			break;
+		}
+		case MENU_RECORD:
+			printTimeOLED(recordStartTime, recordState, currentFilename);
+			break;
+		case MENU_PLAY:
+			break;
+		default:
+			break;
+		}
+		usleep(10 * 1000);
+	}
+	shutdownOLED();
+	recordThread.detach();
+	return 0;
 }
 
 
