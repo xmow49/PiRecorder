@@ -19,7 +19,7 @@ void setupOLED() {
 	}
 	
 	OLED.OLEDbegin(); // initialize the OLED
-	uint8_t screenBuffer[OLED_WIDTH * (OLED_HEIGHT / 8) + 1];
+	static uint8_t screenBuffer[OLED_WIDTH * (OLED_HEIGHT / 8) + 1];
 	OLED.buffer = (uint8_t*)&screenBuffer;  // set that to library buffer pointer
 	
 	OLED.OLEDclearBuffer(); // Clear active buffer 

@@ -97,6 +97,7 @@
     <ClCompile Include="alsa.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="oled.cpp" />
+    <ClCompile Include="sound.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="pi-recorder.service" />
@@ -106,11 +107,12 @@
     <ClInclude Include="alsa.h" />
     <ClInclude Include="config.h" />
     <ClInclude Include="oled.h" />
+    <ClInclude Include="sound.h" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <Link>
       <LibraryDependencies>pthread;bcm2835;rt;SSD1306_OLED_RPI;asound</LibraryDependencies>
-      <AdditionalLibraryDirectories>/usr/local/include;/usr/include/alsa/;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>/usr/local/include;/usr/include;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

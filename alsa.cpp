@@ -7,6 +7,7 @@
 // Include the ALSA .H file that defines ALSA functions/data
 #include <alsa/asoundlib.h>
 #include <alsa/control.h>
+
 using namespace std;
 
 #pragma pack (1)
@@ -153,8 +154,11 @@ static unsigned char waveLoad(const char* fn)
 			}
 
 			// Read in next chunk header
+			int a = 0;
 			while (read(inHandle, &head, sizeof(CHUNK_head)) == sizeof(CHUNK_head))
 			{
+				a++;
+				cout << "read " << a << endl;
 				// ============================ Is it a fmt chunk? ===============================
 				if (compareID(&Fmt[0], &head.ID[0]))
 				{
@@ -179,6 +183,7 @@ static unsigned char waveLoad(const char* fn)
 				else if (compareID(&Data[0], &head.ID[0]))
 				{
 					// Size of wave data is head.Length. Allocate a buffer and read in the wave data
+					cout << "mallocSize: " << head.Length << endl;
 					if (!(WavePtr = (unsigned char*)malloc(head.Length)))
 					{
 						message = "won't fit in RAM";
@@ -190,7 +195,13 @@ static unsigned char waveLoad(const char* fn)
 						free(WavePtr);
 						break;
 					}
-
+					
+					//cout << "wavLoaded " << endl;
+					//for (int i = 0; i < head.Length; i++) {
+					//	cout << (int)WavePtr[i] << " ";
+					//	if(i % 16 == 15) cout << endl;
+					//}
+					
 					// Store size (in frames)
 					WaveSize = (head.Length * 8) / ((unsigned int)WaveBits * (unsigned int)WaveChannels);
 
@@ -223,6 +234,7 @@ static unsigned char waveLoad(const char* fn)
 
 
 
+
 /********************** play_audio() **********************
  * Plays the loaded waveform.
  *
@@ -237,11 +249,19 @@ static void play_audio(void)
 
 	// Output the wave data
 	count = 0;
-	cout << "start: " << WaveSize - count << endl;
+	cout << "WavePtr: " << sizeof(WavePtr) << endl;
+	cout << "WaveSize: " << WaveSize << endl;
+	
+	cout << "aaa: " << (WaveSize * (sizeof(WavePtr) / 2))/2 << endl;
+
+	cout << "50k" << (void*)( & WavePtr[50000]) << endl;
+	cout << "all" << (void*)(WavePtr) << endl;
+	cout << "sub" << (int)(&WavePtr[50000] - WavePtr) << endl;
 	do
 	{
-		
-		frames = snd_pcm_writei(PlaybackHandle, WavePtr + count, WaveSize - count);
+		//frames = snd_pcm_writei(PlaybackHandle, WavePtr + count, WaveSize - count);
+		int value = 1000000;
+		frames = snd_pcm_writei(PlaybackHandle, &WavePtr[value] , WaveSize - value/2);
 
 		// If an error, try to recover from it
 		if (frames < 0)
@@ -254,11 +274,10 @@ static void play_audio(void)
 
 		// Update our pointer
 		count += frames;
-
+		cout << "count: " << count << endl;
 		
 
 	} while (count < WaveSize);
-	cout << a << endl;
 	// Wait for playback to completely finish
 	if (count == WaveSize)
 		snd_pcm_drain(PlaybackHandle);
@@ -330,6 +349,7 @@ void alsa_play(char path[])
 				play_audio();
 
 			// Close sound card
+			
 			snd_pcm_close(PlaybackHandle);
 		}
 	}

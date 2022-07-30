@@ -314,7 +314,7 @@ int main(int argc, char** argv) {
 
 					case B_RIGHT: {
 						displayMenu = displayMenu < 2 ? ++displayMenu : displayMenu;
-						alsa_play("/mnt/records/R000265.wav");
+						alsa_play("/mnt/records/R000269.wav");
 						
 						break;
 					}
