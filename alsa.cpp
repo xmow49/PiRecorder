@@ -3,10 +3,14 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <iostream>
+#include <bcm2835.h>
 
 // Include the ALSA .H file that defines ALSA functions/data
 #include <alsa/asoundlib.h>
 #include <alsa/control.h>
+
+#include "config.h"
+#include "gpio.h"
 
 using namespace std;
 
@@ -53,16 +57,19 @@ typedef struct _FORMAT {
 // small in order to minimize latency. If you have trouble
 // with underruns, you may need to increase this, and PERIODSIZE
 // (trading off lower latency for more stability)
-#define BUFFERSIZE	(2*1024)
+//#define BUFFERSIZE	(2*1024)
+#define BUFFERSIZE	(2*16)
 
 // How many sample points the ALSA card plays before it calls
 // our callback to fill some more of the audio card's hardware
 // buffer. Here we want ALSA to call our callback after every
 // 64 sample points have been played
-#define PERIODSIZE	(2*64)
+#define PERIODSIZE	(2*4)
 
 // Handle to ALSA (audio card's) playback port
 snd_pcm_t* PlaybackHandle;
+
+snd_pcm_hw_params_t* params;
 
 // Handle to our callback thread
 snd_async_handler_t* CallbackHandle;
@@ -72,6 +79,8 @@ unsigned char* WavePtr;
 
 // Size (in frames) of loaded WAVE file's data
 snd_pcm_uframes_t		WaveSize;
+
+snd_pcm_uframes_t paramFrames;
 
 // Sample rate
 unsigned short			WaveRate;
@@ -195,13 +204,13 @@ static unsigned char waveLoad(const char* fn)
 						free(WavePtr);
 						break;
 					}
-					
+
 					//cout << "wavLoaded " << endl;
 					//for (int i = 0; i < head.Length; i++) {
 					//	cout << (int)WavePtr[i] << " ";
 					//	if(i % 16 == 15) cout << endl;
 					//}
-					
+
 					// Store size (in frames)
 					WaveSize = (head.Length * 8) / ((unsigned int)WaveBits * (unsigned int)WaveChannels);
 
@@ -246,23 +255,16 @@ static unsigned char waveLoad(const char* fn)
 static void play_audio(void)
 {
 	register snd_pcm_uframes_t		count, frames;
-
 	// Output the wave data
 	count = 0;
-	cout << "WavePtr: " << sizeof(WavePtr) << endl;
-	cout << "WaveSize: " << WaveSize << endl;
-	
-	cout << "aaa: " << (WaveSize * (sizeof(WavePtr) / 2))/2 << endl;
-
-	cout << "50k" << (void*)( & WavePtr[50000]) << endl;
-	cout << "all" << (void*)(WavePtr) << endl;
-	cout << "sub" << (int)(&WavePtr[50000] - WavePtr) << endl;
+	bool playState = true;
 	do
 	{
-		//frames = snd_pcm_writei(PlaybackHandle, WavePtr + count, WaveSize - count);
-		int value = 1000000;
-		frames = snd_pcm_writei(PlaybackHandle, &WavePtr[value] , WaveSize - value/2);
-
+		int nFrame = 1000; // n frame will be play for this loop turn
+		if ((int)WaveSize - (int)count < nFrame) { //if the rest of the wave is less than nFrame, then play the rest of the wave
+			nFrame = (int)WaveSize - (int)count;
+		}
+		frames = snd_pcm_writei(PlaybackHandle, WavePtr + 2 * count, nFrame); //play nFrame of the Wave
 		// If an error, try to recover from it
 		if (frames < 0)
 			frames = snd_pcm_recover(PlaybackHandle, frames, 0);
@@ -271,11 +273,33 @@ static void play_audio(void)
 			printf("Error playing wave: %s\n", snd_strerror(frames));
 			break;
 		}
-
 		// Update our pointer
 		count += frames;
 		cout << "count: " << count << endl;
-		
+
+		bool state[3];
+
+
+		readButtonsStates(buttons, state);
+
+		if (state[B_OK] == false) {
+			playState = false;
+			while (state[B_OK] == false){
+				readButtonsStates(buttons, state);
+			}
+		}
+
+		cout << "playState: " << playState << endl;
+		while (playState == false) {
+			readButtonsStates(buttons, state);
+			if (state[B_OK] == false) {
+				playState = true;
+				while (state[B_OK] == false) {
+					readButtonsStates(buttons, state);
+				}
+			}
+		}
+
 
 	} while (count < WaveSize);
 	// Wait for playback to completely finish
@@ -341,15 +365,29 @@ void alsa_play(char path[])
 			}
 
 			// Set the audio card's hardware parameters (sample rate, bit resolution, etc)
+//			snd_pcm_hw_params(PlaybackHandle, )
 			if ((err = snd_pcm_set_params(PlaybackHandle, (snd_pcm_format_t)err, SND_PCM_ACCESS_RW_INTERLEAVED, WaveChannels, WaveRate, 1, 500000)) < 0)
 				printf("Can't set sound parameters: %s\n", snd_strerror(err));
 
 			// Play the waveform
-			else
+			else {
+
+				/*int dir;
+				snd_pcm_hw_params_alloca(&params);
+				snd_pcm_hw_params_any(PlaybackHandle, params);
+				snd_pcm_hw_params_set_access(PlaybackHandle, params,
+					SND_PCM_ACCESS_RW_INTERLEAVED);
+				snd_pcm_hw_params_set_channels(PlaybackHandle, params, 2);
+
+				paramFrames = 64;
+				snd_pcm_hw_params_set_period_size_near(PlaybackHandle,
+					params, &paramFrames, &dir);
+				*/
 				play_audio();
+			}
 
 			// Close sound card
-			
+
 			snd_pcm_close(PlaybackHandle);
 		}
 	}

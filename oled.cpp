@@ -133,3 +133,11 @@ string humanReadable(long long size) {
 	}
 	return to_string(size) + suffixes[i];
 }
+
+void printMenuTitle(char * text) {
+	OLED.OLEDclearBuffer();
+	OLED.setTextSize(2);
+	OLED.setCursor(20, 13);
+	OLED.print(text);
+	OLED.OLEDupdate();
+}

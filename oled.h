@@ -12,3 +12,5 @@ string humanReadable(long long size);
 
 void printSoundCardError();
 void printSoundCardRetry();
+
+void printMenuTitle(char* text);

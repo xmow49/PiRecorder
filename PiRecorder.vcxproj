@@ -95,6 +95,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="alsa.cpp" />
+    <ClCompile Include="gpio.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="oled.cpp" />
     <ClCompile Include="sound.cpp" />
@@ -106,6 +107,7 @@
   <ItemGroup>
     <ClInclude Include="alsa.h" />
     <ClInclude Include="config.h" />
+    <ClInclude Include="gpio.h" />
     <ClInclude Include="oled.h" />
     <ClInclude Include="sound.h" />
   </ItemGroup>

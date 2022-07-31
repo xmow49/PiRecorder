@@ -8,3 +8,5 @@
 #define MENU_INFO 0
 #define MENU_RECORD 1
 #define MENU_PLAY 2
+
+constexpr uint8_t buttons[3] = { 17,27,22 };

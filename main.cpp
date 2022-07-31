@@ -43,6 +43,7 @@ sudo make
 #include "oled.h"
 #include "config.h"
 #include "alsa.h"
+#include "gpio.h"
 
 
 using namespace std;
@@ -227,12 +228,11 @@ void stopProgram(int signal_number) {
 }
 
 
-void readButtonsStates(const uint8_t buttonsPins[], bool buttonsStates[]) {
-	for (uint i = 0; i < 3; i++) {
-		buttonsStates[i] = bcm2835_gpio_lev(buttonsPins[i]);
-	}
-}
-
+struct Display
+{
+	char menu = 1;
+	bool active = true;
+};
 
 int main(int argc, char** argv) {
 	signal(SIGINT, stopProgram);
@@ -242,7 +242,6 @@ int main(int argc, char** argv) {
 
 	std::thread recordThread;
 
-	uint8_t buttons[3] = { 17,27,22 };
 
 	for (uint i = 0; i < 3; i++) {
 		bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
@@ -273,48 +272,96 @@ int main(int argc, char** argv) {
 	bool buttonsStates[3] = { 1 , 1 , 1 };
 	bool previousBoutonsStates[3] = { 1 , 1 , 1 };
 
-	char displayMenu = 1;
+	Display display;
+			time_t startPushTime;
 	while (mainLoop) {
 		readButtonsStates(buttons, buttonsStates);
 		static string currentFilename = "";
+
 		for (uint i = 0; i < 3; i++) {
 			if (buttonsStates[i] != previousBoutonsStates[i]) {
 				//new State
-				if (buttonsStates[i] == 0) {
-					cout << "Menu: " << +displayMenu << endl;
-					//button pushed
 
+				if (buttonsStates[i] == 0) { //when button pressed
+					startPushTime = std::time(nullptr);
+				}
+				else{ //action on release
+					//button pushed
+					
 					switch (i)
 					{
 					case B_LEFT:
 					{
-						displayMenu = displayMenu > 0 ? --displayMenu : displayMenu;
-						string ip = "IP:" + getIPAddress();
-						long long used, size;
-						readSpace(recordPath, &used, &size);
-						cout << used << "/" << size << endl;
-						printInfo(ip, used, size);
+						if (display.active) {
+							switch (display.menu)
+							{
+							case MENU_INFO:
+							{
+								break;
+							}
+							default:
+								break;
+							}
+						}
+						else {
+							display.menu = display.menu > 0 ? --display.menu : display.menu;
+						}
+
 						break;
 					}
 
 					case B_OK:
-						recordState = !recordState;
-						if (recordState) {
-							printf("start Recording\n");
-							recordThread = std::thread(record, soundCards, &currentFilename);
-							recordStartTime = std::time(nullptr);
+						if (time(nullptr) - startPushTime > 2) { //long press
+							display.active = !display.active;
+							cout << "LongPress : active : " << display.active << endl;
+
+						}else
+						if (display.active) {
+							switch (display.menu)
+							{
+							case MENU_RECORD:
+							{
+								recordState = !recordState;
+								if (recordState) {
+									printf("start Recording\n");
+									recordThread = std::thread(record, soundCards, &currentFilename);
+									recordStartTime = std::time(nullptr);
+								}
+								else {
+									printf("stop Recording\n");
+									system("killall arecord");
+									recordThread.join();
+									recordStartTime = 0;
+								}
+								break;
+							}
+							case MENU_INFO: {
+								string ip = "IP:" + getIPAddress();
+								long long used, size;
+								readSpace(recordPath, &used, &size);
+								cout << used << "/" << size << endl;
+								printInfo(ip, used, size);
+								break;
+							}
+							default:
+								break;
+							}
 						}
 						else {
-							printf("stop Recording\n");
-							system("killall arecord");
-							recordThread.join();
-							recordStartTime = 0;
+							display.active = !display.active;
 						}
+						
+
 						break;
 
 					case B_RIGHT: {
-						displayMenu = displayMenu < 2 ? ++displayMenu : displayMenu;
-						alsa_play("/mnt/records/R000269.wav");
+						if (display.active) {
+
+						}
+						else {
+							display.menu = display.menu < 2 ? ++display.menu : display.menu;
+						}
+						//alsa_play("/mnt/records/R000265.wav");
 						
 						break;
 					}
@@ -326,21 +373,37 @@ int main(int argc, char** argv) {
 				}
 				usleep(50 * 1000);
 				previousBoutonsStates[i] = buttonsStates[i];
+				cout << "Menu: " << +display.menu << " --> Active: " << display.active << endl;
 			}
 		}
 
 
-		switch (displayMenu)
+		switch (display.menu)
 		{
 		case MENU_INFO:
 		{
-			printInfo();
+			if (display.active) {
+				printInfo();
+			}
+			else {
+				printMenuTitle("INFOS");
+			}
 			break;
 		}
 		case MENU_RECORD:
-			printTimeOLED(recordStartTime, recordState, currentFilename);
+			if (display.active) {
+				printTimeOLED(recordStartTime, recordState, currentFilename);
+			}
+			else {
+				printMenuTitle("REC");
+			}
 			break;
 		case MENU_PLAY:
+			if (display.active) {
+			}
+			else {
+				printMenuTitle("ECOUTER");
+			}
 			break;
 		default:
 			break;
