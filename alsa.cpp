@@ -49,9 +49,6 @@ typedef struct _FORMAT {
 
 
 
-
-
-
 // Size of the audio card hardware buffer. Here we want it
 // set to 1024 16-bit sample points. This is relatively
 // small in order to minimize latency. If you have trouble
@@ -284,7 +281,7 @@ static void play_audio(void)
 
 		if (state[B_OK] == false) {
 			playState = false;
-			while (state[B_OK] == false){
+			while (state[B_OK] == false) {
 				readButtonsStates(buttons, state);
 			}
 		}

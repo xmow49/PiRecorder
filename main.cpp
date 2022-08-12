@@ -273,17 +273,23 @@ int main(int argc, char** argv) {
 	bool previousBoutonsStates[3] = { 1 , 1 , 1 };
 
 	Display display;
-			time_t startPushTime;
+	time_t startPushTime = time(nullptr);
 	while (mainLoop) {
 		readButtonsStates(buttons, buttonsStates);
 		static string currentFilename = "";
 
 		for (uint i = 0; i < 3; i++) {
+			if (buttonsStates[i] == 0 && time(nullptr) - startPushTime > 2) {
+				cout << "LONG PRESS END" << buttonsStates[i] << endl;
+				buttonsStates[i] = 1; //release button
+				previousBoutonsStates[i] = 0; //force refresh
+			}
 			if (buttonsStates[i] != previousBoutonsStates[i]) {
 				//new State
 
 				if (buttonsStates[i] == 0) { //when button pressed
 					startPushTime = std::time(nullptr);
+					
 				}
 				else{ //action on release
 					//button pushed
@@ -314,7 +320,6 @@ int main(int argc, char** argv) {
 						if (time(nullptr) - startPushTime > 2) { //long press
 							display.active = !display.active;
 							cout << "LongPress : active : " << display.active << endl;
-
 						}else
 						if (display.active) {
 							switch (display.menu)
