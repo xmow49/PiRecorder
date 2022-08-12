@@ -127,7 +127,7 @@ string generateFilename() {
 	configFile << "FILEID=" << fileId << endl;
 	configFile.close();
 
-	char name[10];
+	char name[15];
 	sprintf(name, "R%06lu.wav", fileId);
 	return name;
 }
@@ -274,12 +274,13 @@ int main(int argc, char** argv) {
 
 	Display display;
 	time_t startPushTime = time(nullptr);
+	bool longPressRunning = false;
 	while (mainLoop) {
 		readButtonsStates(buttons, buttonsStates);
 		static string currentFilename = "";
 
 		for (uint i = 0; i < 3; i++) {
-			if (buttonsStates[i] == 0 && time(nullptr) - startPushTime > 2) {
+			if (buttonsStates[i] == 0 && time(nullptr) - startPushTime > 2 && longPressRunning) {
 				cout << "LONG PRESS END" << buttonsStates[i] << endl;
 				buttonsStates[i] = 1; //release button
 				previousBoutonsStates[i] = 0; //force refresh
@@ -289,7 +290,7 @@ int main(int argc, char** argv) {
 
 				if (buttonsStates[i] == 0) { //when button pressed
 					startPushTime = std::time(nullptr);
-					
+					longPressRunning = true;
 				}
 				else{ //action on release
 					//button pushed
@@ -319,6 +320,7 @@ int main(int argc, char** argv) {
 					case B_OK:
 						if (time(nullptr) - startPushTime > 2) { //long press
 							display.active = !display.active;
+							longPressRunning = false;
 							cout << "LongPress : active : " << display.active << endl;
 						}else
 						if (display.active) {

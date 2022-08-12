@@ -55,7 +55,7 @@ void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
 			long int minutes = time / 60;
 			long int second = time - hour * 60 * 60 - minutes * 60;
 
-			sprintf(text, "%02d:%02d:%02d", hour, minutes, second);
+			sprintf(text, "%02ld:%02ld:%02ld", hour, minutes, second);
 		}
 		OLED.OLEDclearBuffer(); // Clear active buffer 
 		OLED.setTextColor(WHITE);
