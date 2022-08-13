@@ -5,50 +5,57 @@
 #include <string>
 #include <time.h>
 #include <unistd.h>
-
-
-SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object 
-
+#include <iostream>
+#include <string>
+#include <vector>
 using namespace std;
+SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object
 
 
-void setupOLED() {
+
+void setupOLED()
+{
 	if (!bcm2835_init())
 	{
 		printf("Error 1201: init bcm2835 library\r\n");
 	}
-	
+
 	OLED.OLEDbegin(); // initialize the OLED
 	static uint8_t screenBuffer[OLED_WIDTH * (OLED_HEIGHT / 8) + 1];
-	OLED.buffer = (uint8_t*)&screenBuffer;  // set that to library buffer pointer
-	
-	OLED.OLEDclearBuffer(); // Clear active buffer 
+	OLED.buffer = (uint8_t *)&screenBuffer; // set that to library buffer pointer
+
+	OLED.OLEDclearBuffer(); // Clear active buffer
 	OLED.setTextColor(WHITE);
 	OLED.setTextSize(2);
 	OLED.setCursor(5, 13);
 	OLED.print("PiRecorder");
-	OLED.OLEDupdate();  //write to active buffer
+	OLED.OLEDupdate(); // write to active buffer
 	usleep(1 * 1000 * 1000);
 }
 
-void shutdownOLED() {
-	OLED.OLEDclearBuffer(); // Clear active buffer 
-	OLED.OLEDupdate();  //write to active buffer
-	OLED.OLEDPowerDown(); //Switch off display
-	bcm2835_close(); // Close the library
+void shutdownOLED()
+{
+	OLED.OLEDclearBuffer(); // Clear active buffer
+	OLED.OLEDupdate();		// write to active buffer
+	OLED.OLEDPowerDown();	// Switch off display
+	bcm2835_close();		// Close the library
 }
 
-void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
+void printTimeOLED(time_t recordStartTime, bool recordState, string filename)
+{
 	time_t now = time(nullptr);
 	static time_t lastRefreshTime;
 
-	if (now != lastRefreshTime) { //every second
+	if (now != lastRefreshTime)
+	{ // every second
 		lastRefreshTime = now;
 		char text[15];
-		if (recordStartTime == 0) {
+		if (recordStartTime == 0)
+		{
 			sprintf(text, "00:00:00");
 		}
-		else {
+		else
+		{
 			time_t time = now - recordStartTime;
 
 			long int hour = time / 60 / 60;
@@ -57,12 +64,13 @@ void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
 
 			sprintf(text, "%02ld:%02ld:%02ld", hour, minutes, second);
 		}
-		OLED.OLEDclearBuffer(); // Clear active buffer 
+		OLED.OLEDclearBuffer(); // Clear active buffer
 		OLED.setTextColor(WHITE);
 		OLED.setTextSize(2);
 		OLED.setCursor(15, 13);
 		OLED.print(text);
-		if (recordState) {
+		if (recordState)
+		{
 			OLED.setTextSize(1);
 			OLED.setCursor(0, 0);
 			OLED.print("REC");
@@ -73,17 +81,21 @@ void printTimeOLED(time_t recordStartTime, bool recordState, string filename) {
 	}
 }
 
-void printInfo(string updateIP, long long updateUsed, long long updateSize) {
+void printInfo(string updateIP, long long updateUsed, long long updateSize)
+{
 	static string ip = "";
 	static long long used = 0;
 	static long long size = 0;
-	if (updateIP != "") {
+	if (updateIP != "")
+	{
 		ip = updateIP;
 	}
-	if (updateUsed != 0) {
+	if (updateUsed != 0)
+	{
 		used = updateUsed;
 	}
-	if (updateSize != 0) {
+	if (updateSize != 0)
+	{
 		size = updateSize;
 	}
 
@@ -103,7 +115,8 @@ void printInfo(string updateIP, long long updateUsed, long long updateSize) {
 	OLED.OLEDupdate();
 }
 
-void printSoundCardError() {
+void printSoundCardError()
+{
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(2);
 	OLED.setCursor(20, 0);
@@ -116,7 +129,8 @@ void printSoundCardError() {
 	OLED.OLEDupdate();
 }
 
-void printSoundCardRetry() {
+void printSoundCardRetry()
+{
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(2);
 	OLED.setCursor(20, 13);
@@ -124,20 +138,46 @@ void printSoundCardRetry() {
 	OLED.OLEDupdate();
 }
 
-string humanReadable(long long size) {
-	string suffixes[] = { "B", "KB", "MB", "GB", "TB" };
+string humanReadable(long long size)
+{
+	string suffixes[] = {"B", "KB", "MB", "GB", "TB"};
 	int i = 0;
-	while (size >= 1000) {
+	while (size >= 1000)
+	{
 		size /= 1000;
 		i++;
 	}
 	return to_string(size) + suffixes[i];
 }
 
-void printMenuTitle(char * text) {
+void printMenuTitle(char *text)
+{
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(2);
 	OLED.setCursor(20, 13);
 	OLED.print(text);
+	OLED.OLEDupdate();
+}
+
+void printPlay(std::vector<string> newFiles, unsigned int index)
+{
+	static std::vector<string> files;
+	if(newFiles.size() != 0)
+		files = newFiles;
+	
+	OLED.OLEDclearBuffer();
+	OLED.setTextSize(1);
+	OLED.setCursor(10, 0);
+	OLED.print(files[index-1].c_str());
+
+	OLED.setCursor(0, 10);
+	OLED.print(">");
+
+	OLED.setCursor(10, 10);
+	OLED.print(files[index].c_str());
+
+	OLED.setCursor(10, 20);
+	OLED.print(files[index+1].c_str());
+
 	OLED.OLEDupdate();
 }

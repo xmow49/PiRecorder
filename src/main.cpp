@@ -44,29 +44,33 @@ sudo make
 #include "config.h"
 #include "alsa.h"
 #include "gpio.h"
-
+#include "files.h"
 
 using namespace std;
 
 string recordPath = "/mnt/records/";
 string configPath = recordPath + ".recorder";
 
-
-string getIPAddress() {
+string getIPAddress()
+{
 	string ipAddress = "Unable to get IP Address";
-	struct ifaddrs* interfaces = NULL;
-	struct ifaddrs* temp_addr = NULL;
+	struct ifaddrs *interfaces = NULL;
+	struct ifaddrs *temp_addr = NULL;
 	int success = 0;
 	// retrieve the current interfaces - returns 0 on success
 	success = getifaddrs(&interfaces);
-	if (success == 0) {
+	if (success == 0)
+	{
 		// Loop through linked list of interfaces
 		temp_addr = interfaces;
-		while (temp_addr != NULL) {
-			if (temp_addr->ifa_addr->sa_family == AF_INET) {
+		while (temp_addr != NULL)
+		{
+			if (temp_addr->ifa_addr->sa_family == AF_INET)
+			{
 				// Check if interface is en0 which is the wifi connection on the iPhone
-				if (strcmp(temp_addr->ifa_name, "en0")) {
-					ipAddress = inet_ntoa(((struct sockaddr_in*)temp_addr->ifa_addr)->sin_addr);
+				if (strcmp(temp_addr->ifa_name, "en0"))
+				{
+					ipAddress = inet_ntoa(((struct sockaddr_in *)temp_addr->ifa_addr)->sin_addr);
 				}
 			}
 			temp_addr = temp_addr->ifa_next;
@@ -77,40 +81,47 @@ string getIPAddress() {
 	return ipAddress;
 }
 
-
-inline bool checkFileExist(const std::string& name) {
-	if (FILE* file = fopen(name.c_str(), "r")) {
+inline bool checkFileExist(const std::string &name)
+{
+	if (FILE *file = fopen(name.c_str(), "r"))
+	{
 		fclose(file);
 		return true;
 	}
-	else {
+	else
+	{
 		return false;
 	}
 }
 
-string generateFilename() {
+string generateFilename()
+{
 
 	unsigned long fileId;
 
-	if (checkFileExist(configPath)) {
+	if (checkFileExist(configPath))
+	{
 		cout << "config file exists" << endl;
 		ifstream configFile(configPath);
-		//read the file and split with =
+		// read the file and split with =
 		string line;
-		while (getline(configFile, line)) {
+		while (getline(configFile, line))
+		{
 			stringstream ss(line);
 			string key;
 			string value;
 			getline(ss, key, '=');
 			getline(ss, value);
 
-			if (key == "FILEID") {
+			if (key == "FILEID")
+			{
 				fileId = stoul(value);
 			}
 		}
 		configFile.close();
 	}
-	else {
+	else
+	{
 		cout << "config file does not exist" << endl;
 		ofstream configFile;
 		configFile.open(configPath);
@@ -134,8 +145,10 @@ string generateFilename() {
 
 bool recordState = false;
 
-void record(string soundCards[], string* filenameOUT) {
-	while (recordState) {
+void record(string soundCards[], string *filenameOUT)
+{
+	while (recordState)
+	{
 		string filename = generateFilename();
 		*filenameOUT = filename;
 		string cmd = "arecord -D plughw:" + soundCards[0] + " --duration=7200 -r 48000 --format=S16_LE " + recordPath + filename;
@@ -143,17 +156,22 @@ void record(string soundCards[], string* filenameOUT) {
 	}
 }
 
-std::string exec(const char* cmd) {
+std::string exec(const char *cmd)
+{
 	char buffer[128];
 	std::string result = "";
-	FILE* pipe = popen(cmd, "r");
-	if (!pipe) throw std::runtime_error("popen() failed!");
-	try {
-		while (fgets(buffer, sizeof buffer, pipe) != NULL) {
+	FILE *pipe = popen(cmd, "r");
+	if (!pipe)
+		throw std::runtime_error("popen() failed!");
+	try
+	{
+		while (fgets(buffer, sizeof buffer, pipe) != NULL)
+		{
 			result += buffer;
 		}
 	}
-	catch (...) {
+	catch (...)
+	{
 		pclose(pipe);
 		throw;
 	}
@@ -161,35 +179,39 @@ std::string exec(const char* cmd) {
 	return result;
 }
 
-void getSoundCard(string strCardList[]) {
+void getSoundCard(string strCardList[])
+{
 	string result = exec("arecord -l");
 	string line;
 	int cardIndex = 0;
-	if (result.empty()) {
+	if (result.empty())
+	{
 		printf("No Sound Card\n");
 		strCardList[0] = "-1";
 		return;
 	}
-	for (int i = 0; i < (int)result.length(); i++) {
-		if (result[i] == 10) {
-			//new line
-			if (line.find("card") != string::npos) {
-				strCardList[cardIndex] = line[5]; //get the card id
+	for (int i = 0; i < (int)result.length(); i++)
+	{
+		if (result[i] == 10)
+		{
+			// new line
+			if (line.find("card") != string::npos)
+			{
+				strCardList[cardIndex] = line[5]; // get the card id
 				cardIndex++;
 				printf("CARD: %c\n", line[5]);
 			}
 			line = "";
 		}
-		else {
+		else
+		{
 			line += result[i];
 		}
-
 	}
 }
 
-
-
-void readSpace(string path, long long* used, long long* size) {
+void readSpace(string path, long long *used, long long *size)
+{
 	string result = exec("/bin/df");
 	stringstream ss(result);
 	string line;
@@ -197,20 +219,24 @@ void readSpace(string path, long long* used, long long* size) {
 	string cmdValues[6];
 	int cmdIndex = 0;
 
-	while (getline(ss, line)) { //for each line
-		//cout << "Line: " << line << endl;
+	while (getline(ss, line))
+	{ // for each line
+		// cout << "Line: " << line << endl;
 		stringstream key(line);
 		string keyValue;
 		cmdIndex = 0;
 		cmdValues->clear();
-		while (getline(key, keyValue, ' ')) { //for each info (split by spaces)
-			if (keyValue != "") { // If it is a value
-				//cout << "Value: " << keyValue << endl;
+		while (getline(key, keyValue, ' '))
+		{ // for each info (split by spaces)
+			if (keyValue != "")
+			{ // If it is a value
+				// cout << "Value: " << keyValue << endl;
 				cmdValues[cmdIndex] = keyValue;
 				cmdIndex++;
 			}
 		}
-		if (cmdValues[5] == path.substr(0, path.size() - 1)) {
+		if (cmdValues[5] == path.substr(0, path.size() - 1))
+		{
 			/*for (int i = 0; i < 6; i++) {
 				cout << i << ": \"" << cmdValues[i] << "\"" << endl;
 			}*/
@@ -221,12 +247,12 @@ void readSpace(string path, long long* used, long long* size) {
 }
 
 bool mainLoop = true;
-void stopProgram(int signal_number) {
+void stopProgram(int signal_number)
+{
 	recordState = false;
 	system("killall arecord");
 	mainLoop = false;
 }
-
 
 struct Display
 {
@@ -234,7 +260,8 @@ struct Display
 	bool active = true;
 };
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
 	signal(SIGINT, stopProgram);
 	signal(SIGTERM, stopProgram);
 	printf("Pi Recorder\n");
@@ -242,8 +269,8 @@ int main(int argc, char** argv) {
 
 	std::thread recordThread;
 
-
-	for (uint i = 0; i < 3; i++) {
+	for (uint i = 0; i < 3; i++)
+	{
 		bcm2835_gpio_fsel(buttons[i], BCM2835_GPIO_FSEL_INPT);
 		bcm2835_gpio_set_pud(buttons[i], BCM2835_GPIO_PUD_UP);
 	}
@@ -251,13 +278,16 @@ int main(int argc, char** argv) {
 	string soundCards[10];
 	getSoundCard(soundCards);
 
-	while (soundCards[0] == "-1") {
+	while (soundCards[0] == "-1")
+	{
 		printSoundCardError();
 		bool retry = false;
-		while (!retry) {
+		while (!retry)
+		{
 			bool state[3];
 			readButtonsStates(buttons, state);
-			if (state[B_OK] == 0 || state[B_LEFT] == 0 || state[B_RIGHT] == 0) { //button pressed
+			if (state[B_OK] == 0 || state[B_LEFT] == 0 || state[B_RIGHT] == 0)
+			{ // button pressed
 				printSoundCardRetry();
 				getSoundCard(soundCards);
 				retry = true;
@@ -266,40 +296,49 @@ int main(int argc, char** argv) {
 		}
 	}
 
-
 	time_t recordStartTime = 0;
 
-	bool buttonsStates[3] = { 1 , 1 , 1 };
-	bool previousBoutonsStates[3] = { 1 , 1 , 1 };
+	bool buttonsStates[3] = {1, 1, 1};
+	bool previousBoutonsStates[3] = {1, 1, 1};
 
 	Display display;
 	time_t startPushTime = time(nullptr);
-	bool longPressRunning = false;
-	while (mainLoop) {
+	bool longPressRefresh = false;
+	bool longPressStatus = false;
+	while (mainLoop)
+	{
 		readButtonsStates(buttons, buttonsStates);
 		static string currentFilename = "";
 
-		for (uint i = 0; i < 3; i++) {
-			if (buttonsStates[i] == 0 && time(nullptr) - startPushTime > 2 && longPressRunning) {
-				cout << "LONG PRESS END" << buttonsStates[i] << endl;
-				buttonsStates[i] = 1; //release button
-				previousBoutonsStates[i] = 0; //force refresh
-			}
-			if (buttonsStates[i] != previousBoutonsStates[i]) {
-				//new State
+		for (uint i = 0; i < 3; i++)
+		{
+			if (i == B_OK && buttonsStates[B_OK] == 0 && time(nullptr) > startPushTime + 1 && !longPressRefresh && longPressStatus)
+			{
+				cout << "LONG PRESS END" << endl;
+				longPressRefresh = true;
+				longPressStatus = false;
+				display.active = !display.active;
 
-				if (buttonsStates[i] == 0) { //when button pressed
+				cout << "LongPress : active : " << display.active << endl;
+			}
+			if (buttonsStates[i] != previousBoutonsStates[i])
+			{
+				// new State
+				if (buttonsStates[i] == 0)
+				{ // when button pressed
+					longPressStatus = true;
 					startPushTime = std::time(nullptr);
-					longPressRunning = true;
 				}
-				else{ //action on release
-					//button pushed
-					
+				else
+				{ // action on release
+				  // button pushed
+					longPressStatus = false;
 					switch (i)
 					{
 					case B_LEFT:
 					{
-						if (display.active) {
+						if (display.active)
+						{
 							switch (display.menu)
 							{
 							case MENU_INFO:
@@ -310,31 +349,28 @@ int main(int argc, char** argv) {
 								break;
 							}
 						}
-						else {
+						else
+						{
 							display.menu = display.menu > 0 ? --display.menu : display.menu;
 						}
-
 						break;
 					}
-
 					case B_OK:
-						if (time(nullptr) - startPushTime > 2) { //long press
-							display.active = !display.active;
-							longPressRunning = false;
-							cout << "LongPress : active : " << display.active << endl;
-						}else
-						if (display.active) {
+						if (display.active)
+						{
 							switch (display.menu)
 							{
 							case MENU_RECORD:
 							{
 								recordState = !recordState;
-								if (recordState) {
+								if (recordState)
+								{
 									printf("start Recording\n");
 									recordThread = std::thread(record, soundCards, &currentFilename);
 									recordStartTime = std::time(nullptr);
 								}
-								else {
+								else
+								{
 									printf("stop Recording\n");
 									system("killall arecord");
 									recordThread.join();
@@ -342,7 +378,8 @@ int main(int argc, char** argv) {
 								}
 								break;
 							}
-							case MENU_INFO: {
+							case MENU_INFO:
+							{
 								string ip = "IP:" + getIPAddress();
 								long long used, size;
 								readSpace(recordPath, &used, &size);
@@ -354,29 +391,54 @@ int main(int argc, char** argv) {
 								break;
 							}
 						}
-						else {
-							display.active = !display.active;
-						}
-						
+						else
+						{
+							if (longPressRefresh)
+								longPressRefresh = false;
+							else
+								display.active = !display.active;
 
+							// on change menue
+							switch (display.menu)
+							{
+							case MENU_RECORD:
+								break;
+							case MENU_INFO:
+							{
+								string ip = "IP:" + getIPAddress();
+								long long used, size;
+								readSpace(recordPath, &used, &size);
+								cout << used << "/" << size << endl;
+								printInfo(ip, used, size);
+								break;
+							}
+							case MENU_PLAY:
+							{
+								vector<string> files = getFiles(recordPath);
+								printPlay(files, 1);
+								break;
+							}
+							}
+						}
 						break;
 
-					case B_RIGHT: {
-						if (display.active) {
-
+					case B_RIGHT:
+					{
+						if (display.active)
+						{
 						}
-						else {
+						else
+						{
 							display.menu = display.menu < 2 ? ++display.menu : display.menu;
 						}
-						//alsa_play("/mnt/records/R000265.wav");
-						
+						// alsa_play("/mnt/records/R000265.wav");
+
 						break;
 					}
 
 					default:
 						break;
 					}
-
 				}
 				usleep(50 * 1000);
 				previousBoutonsStates[i] = buttonsStates[i];
@@ -384,31 +446,37 @@ int main(int argc, char** argv) {
 			}
 		}
 
-
 		switch (display.menu)
 		{
 		case MENU_INFO:
 		{
-			if (display.active) {
+			if (display.active)
+			{
 				printInfo();
 			}
-			else {
+			else
+			{
 				printMenuTitle("INFOS");
 			}
 			break;
 		}
 		case MENU_RECORD:
-			if (display.active) {
+			if (display.active)
+			{
 				printTimeOLED(recordStartTime, recordState, currentFilename);
 			}
-			else {
+			else
+			{
 				printMenuTitle("REC");
 			}
 			break;
 		case MENU_PLAY:
-			if (display.active) {
+			if (display.active)
+			{
+				//printPlay("R000001.wav", "R000002.wav", "R000003.wav");
 			}
-			else {
+			else
+			{
 				printMenuTitle("ECOUTER");
 			}
 			break;
@@ -421,5 +489,3 @@ int main(int argc, char** argv) {
 	recordThread.detach();
 	return 0;
 }
-
-

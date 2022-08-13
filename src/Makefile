@@ -19,7 +19,7 @@
 # 	$(RM) $(TARGET)/*.out
 
 CC := g++
-CFLAGS := -Wall -g -lpthread -lbcm2835 -lSSD1306_OLED_RPI -lasound
+CFLAGS := -Wall -g -lpthread -lbcm2835 -lSSD1306_OLED_RPI -lasound -lstdc++fs
 TARGET := PiRecorder
 BUILD_FOLDER := ./build
 
