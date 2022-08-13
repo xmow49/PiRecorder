@@ -1,5 +1,6 @@
 #include <string>
 #include <time.h>
+#include <vector>
 
 using namespace std;
 	
@@ -14,3 +15,5 @@ void printSoundCardError();
 void printSoundCardRetry();
 
 void printMenuTitle(char* text);
+
+void printPlay(std::vector<string> Newfiles, unsigned int index);
