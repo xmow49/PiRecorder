@@ -9,7 +9,19 @@ vector<string> getFiles(string path)
 {
     vector<string> files;
     for (const auto &entry : fs::directory_iterator(path))
-        files.push_back(entry.path().filename());
+    {
+        string filename = entry.path().stem();
+        string filenameWithExtension = entry.path().filename();
+        try
+        {
+            string extension = filenameWithExtension.substr(filenameWithExtension.find("1"));
+        }
+        catch(...){
+
+        }
+
+        files.push_back(filename);
+    }
 
     for (int i = 0; i < files.size(); i++)
         cout << files[i] << "\n";

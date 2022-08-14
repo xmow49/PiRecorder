@@ -16,4 +16,4 @@ void printSoundCardRetry();
 
 void printMenuTitle(char* text);
 
-void printPlay(std::vector<string> Newfiles, unsigned int index);
+void printPlay(std::vector<string> newFiles, unsigned char action);

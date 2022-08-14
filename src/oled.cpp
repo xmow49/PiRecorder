@@ -5,13 +5,12 @@
 #include <string>
 #include <time.h>
 #include <unistd.h>
-#include <iostream>
+//#include <iostream>
 #include <string>
 #include <vector>
 using namespace std;
+
 SSD1306 OLED(OLED_WIDTH, OLED_HEIGHT); // instantiate  an object
-
-
 
 void setupOLED()
 {
@@ -159,25 +158,44 @@ void printMenuTitle(char *text)
 	OLED.OLEDupdate();
 }
 
-void printPlay(std::vector<string> newFiles, unsigned int index)
+void printPlay(std::vector<string> newFiles, unsigned char action)
 {
 	static std::vector<string> files;
-	if(newFiles.size() != 0)
+	static unsigned int index = 1;
+	if (newFiles.size() != 0)
 		files = newFiles;
-	
+
+	switch (action)
+	{
+	case 'U':
+		index = index < files.size() ? ++index : index;
+		break;
+	case 'D':
+		index = index > 1 ? --index : index;
+	default:
+		break;
+	}
+
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(1);
 	OLED.setCursor(10, 0);
-	OLED.print(files[index-1].c_str());
+	OLED.print(files[index - 1].c_str());
 
-	OLED.setCursor(0, 10);
+	if (index == 1)
+	{
+		OLED.setCursor(0, 0);
+	}
+	else
+	{
+		OLED.setCursor(0, 10);
+	}
 	OLED.print(">");
 
 	OLED.setCursor(10, 10);
 	OLED.print(files[index].c_str());
 
 	OLED.setCursor(10, 20);
-	OLED.print(files[index+1].c_str());
+	OLED.print(files[index + 1].c_str());
 
 	OLED.OLEDupdate();
 }

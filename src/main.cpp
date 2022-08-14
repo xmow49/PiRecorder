@@ -345,6 +345,12 @@ int main(int argc, char **argv)
 							{
 								break;
 							}
+							case MENU_PLAY:
+							{
+								std::vector<string> tmp;
+								printPlay(tmp, 'D');
+								break;
+							}
 							default:
 								break;
 							}
@@ -426,6 +432,21 @@ int main(int argc, char **argv)
 					{
 						if (display.active)
 						{
+							switch (display.menu)
+							{
+							case MENU_INFO:
+							{
+								break;
+							}
+							case MENU_PLAY:
+							{
+								std::vector<string> tmp;
+								printPlay(tmp, 'U');
+								break;
+							}
+							default:
+								break;
+							}
 						}
 						else
 						{
@@ -473,7 +494,7 @@ int main(int argc, char **argv)
 		case MENU_PLAY:
 			if (display.active)
 			{
-				//printPlay("R000001.wav", "R000002.wav", "R000003.wav");
+				// printPlay("R000001.wav", "R000002.wav", "R000003.wav");
 			}
 			else
 			{
