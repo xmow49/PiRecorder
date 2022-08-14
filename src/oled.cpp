@@ -5,7 +5,7 @@
 #include <string>
 #include <time.h>
 #include <unistd.h>
-//#include <iostream>
+
 #include <string>
 #include <vector>
 using namespace std;
@@ -165,13 +165,22 @@ void printPlay(std::vector<string> newFiles, unsigned char action)
 	if (newFiles.size() != 0)
 		files = newFiles;
 
+	static bool maxDOWN = 0;
+	int toto = files.size();
 	switch (action)
 	{
 	case 'U':
-		index = index < files.size() ? ++index : index;
+
+		if (maxDOWN)
+			maxDOWN = false;
+		else
+			index = index < files.size() -2 ? ++index : index;
 		break;
 	case 'D':
-		index = index > 1 ? --index : index;
+		if (index == 0)
+			maxDOWN = true;
+		else
+			index = index > 0 ? --index : index;
 	default:
 		break;
 	}
@@ -179,9 +188,9 @@ void printPlay(std::vector<string> newFiles, unsigned char action)
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(1);
 	OLED.setCursor(10, 0);
-	OLED.print(files[index - 1].c_str());
+	OLED.print(files[index].c_str());
 
-	if (index == 1)
+	if (maxDOWN)
 	{
 		OLED.setCursor(0, 0);
 	}
@@ -189,13 +198,14 @@ void printPlay(std::vector<string> newFiles, unsigned char action)
 	{
 		OLED.setCursor(0, 10);
 	}
+
 	OLED.print(">");
 
 	OLED.setCursor(10, 10);
-	OLED.print(files[index].c_str());
+	OLED.print(files[index + 1].c_str());
 
 	OLED.setCursor(10, 20);
-	OLED.print(files[index + 1].c_str());
+	OLED.print(files[index + 2].c_str());
 
 	OLED.OLEDupdate();
 }

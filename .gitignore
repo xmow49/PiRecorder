@@ -1,5 +1,5 @@
 build
-
+*.o
 
 # User-specific files
 *.rsuser

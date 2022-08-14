@@ -10,20 +10,11 @@ vector<string> getFiles(string path)
     vector<string> files;
     for (const auto &entry : fs::directory_iterator(path))
     {
-        string filename = entry.path().stem();
-        string filenameWithExtension = entry.path().filename();
-        try
+        string filename = entry.path().filename().string();
+        if (filename.find(".wav") != std::string::npos)
         {
-            string extension = filenameWithExtension.substr(filenameWithExtension.find("1"));
+            files.push_back(filename);
         }
-        catch(...){
-
-        }
-
-        files.push_back(filename);
     }
-
-    for (int i = 0; i < files.size(); i++)
-        cout << files[i] << "\n";
     return files;
 }
