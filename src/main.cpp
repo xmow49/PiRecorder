@@ -345,10 +345,10 @@ int main(int argc, char **argv)
 							{
 								break;
 							}
-							case MENU_PLAY:
+							case MENU_RECLIST:
 							{
 								std::vector<string> tmp;
-								printPlay(tmp, 'D');
+								printPlayList(tmp, 'D');
 								break;
 							}
 							default:
@@ -357,11 +357,12 @@ int main(int argc, char **argv)
 						}
 						else
 						{
-							display.menu = display.menu > 0 ? --display.menu : display.menu;
+							display.menu = display.menu > 0 ? --display.menu : 0;
 						}
 						break;
 					}
 					case B_OK:
+					{
 						if (display.active)
 						{
 							switch (display.menu)
@@ -393,6 +394,21 @@ int main(int argc, char **argv)
 								printInfo(ip, used, size);
 								break;
 							}
+							case MENU_RECLIST:
+							{
+								display.menu = MENU_PLAY;
+								vector<string> files = getFiles(recordPath);
+								vector<string> tmp;
+								unsigned int index = printPlayList(tmp, '\0');
+								printPlay(files, recordPath, index);
+
+								string currentPlayingFile = recordPath + files[index];
+								int size = currentPlayingFile.length();
+								char path[size + 1];
+								strcpy(path, currentFilename.c_str());
+								alsa_play(path);
+								break;
+							}
 							default:
 								break;
 							}
@@ -418,16 +434,17 @@ int main(int argc, char **argv)
 								printInfo(ip, used, size);
 								break;
 							}
-							case MENU_PLAY:
+							case MENU_RECLIST:
 							{
 								vector<string> files = getFiles(recordPath);
-								printPlay(files, 1);
+								printPlayList(files, 1);
 								break;
 							}
 							}
 						}
-						break;
 
+						break;
+					}
 					case B_RIGHT:
 					{
 						if (display.active)
@@ -438,10 +455,10 @@ int main(int argc, char **argv)
 							{
 								break;
 							}
-							case MENU_PLAY:
+							case MENU_RECLIST:
 							{
 								std::vector<string> tmp;
-								printPlay(tmp, 'U');
+								printPlayList(tmp, 'U');
 								break;
 							}
 							default:
@@ -450,13 +467,11 @@ int main(int argc, char **argv)
 						}
 						else
 						{
-							display.menu = display.menu < 2 ? ++display.menu : display.menu;
+							display.menu = display.menu < 2 ? ++display.menu : 2;
 						}
-						// alsa_play("/mnt/records/R000265.wav");
 
 						break;
 					}
-
 					default:
 						break;
 					}
@@ -491,10 +506,21 @@ int main(int argc, char **argv)
 				printMenuTitle("REC");
 			}
 			break;
+		case MENU_RECLIST:
+			if (display.active)
+			{
+
+			}
+			else
+			{
+				printMenuTitle("ECOUTER");
+			}
 		case MENU_PLAY:
 			if (display.active)
 			{
 				// printPlay("R000001.wav", "R000002.wav", "R000003.wav");
+				//printPlay(files, recordPath, index);
+				
 			}
 			else
 			{

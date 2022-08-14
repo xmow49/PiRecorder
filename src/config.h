@@ -7,6 +7,7 @@
 
 #define MENU_INFO 0
 #define MENU_RECORD 1
-#define MENU_PLAY 2
+#define MENU_RECLIST 2
+#define MENU_PLAY 3
 
 constexpr uint8_t buttons[3] = { 17,27,22 };

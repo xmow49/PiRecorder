@@ -158,7 +158,7 @@ void printMenuTitle(char *text)
 	OLED.OLEDupdate();
 }
 
-void printPlay(std::vector<string> newFiles, unsigned char action)
+unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 {
 	static std::vector<string> files;
 	static unsigned int index = 1;
@@ -174,7 +174,7 @@ void printPlay(std::vector<string> newFiles, unsigned char action)
 		if (maxDOWN)
 			maxDOWN = false;
 		else
-			index = index < files.size() -2 ? ++index : index;
+			index = index < files.size() - 2 ? ++index : index;
 		break;
 	case 'D':
 		if (index == 0)
@@ -207,5 +207,20 @@ void printPlay(std::vector<string> newFiles, unsigned char action)
 	OLED.setCursor(10, 20);
 	OLED.print(files[index + 2].c_str());
 
+	OLED.OLEDupdate();
+	if(maxDOWN){
+		return index;
+	}
+	return index + 1;
+}
+
+void printPlay(std::vector<string> files, string recordsPath, unsigned int index)
+{
+	string path = recordsPath + files[index];
+
+	OLED.OLEDclearBuffer();
+	OLED.setTextSize(1);
+	OLED.setCursor(0, 0);
+	OLED.print(files[index].c_str());
 	OLED.OLEDupdate();
 }
