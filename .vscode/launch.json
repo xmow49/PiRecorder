@@ -5,7 +5,7 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/src/build/PiRecorder",
+            "program": "${workspaceFolder}/src/PiRecorder",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

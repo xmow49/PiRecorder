@@ -11,43 +11,42 @@
 
 #include "config.h"
 #include "gpio.h"
+#include "oled.h"
 
 using namespace std;
 
-#pragma pack (1)
+#pragma pack(1)
 /////////////////////// WAVE File Stuff /////////////////////
 // An IFF file header looks like this
 typedef struct _FILE_head
 {
-	unsigned char	ID[4];	// could be {'R', 'I', 'F', 'F'} or {'F', 'O', 'R', 'M'}
-	unsigned int	Length;	// Length of subsequent file (including remainder of header). This is in
-									// Intel reverse byte order if RIFF, Motorola format if FORM.
-	unsigned char	Type[4];	// {'W', 'A', 'V', 'E'} or {'A', 'I', 'F', 'F'}
+	unsigned char ID[4];   // could be {'R', 'I', 'F', 'F'} or {'F', 'O', 'R', 'M'}
+	unsigned int Length;   // Length of subsequent file (including remainder of header). This is in
+						   // Intel reverse byte order if RIFF, Motorola format if FORM.
+	unsigned char Type[4]; // {'W', 'A', 'V', 'E'} or {'A', 'I', 'F', 'F'}
 } FILE_head;
-
 
 // An IFF chunk header looks like this
 typedef struct _CHUNK_head
 {
-	unsigned char ID[4];	// 4 ascii chars that is the chunk ID
-	unsigned int	Length;	// Length of subsequent data within this chunk. This is in Intel reverse byte
-							// order if RIFF, Motorola format if FORM. Note: this doesn't include any
-							// extra byte needed to pad the chunk out to an even size.
+	unsigned char ID[4]; // 4 ascii chars that is the chunk ID
+	unsigned int Length; // Length of subsequent data within this chunk. This is in Intel reverse byte
+						 // order if RIFF, Motorola format if FORM. Note: this doesn't include any
+						 // extra byte needed to pad the chunk out to an even size.
 } CHUNK_head;
 
 // WAVE fmt chunk
-typedef struct _FORMAT {
-	short				wFormatTag;
-	unsigned short	wChannels;
-	unsigned int	dwSamplesPerSec;
-	unsigned int	dwAvgBytesPerSec;
-	unsigned short	wBlockAlign;
-	unsigned short	wBitsPerSample;
+typedef struct _FORMAT
+{
+	short wFormatTag;
+	unsigned short wChannels;
+	unsigned int dwSamplesPerSec;
+	unsigned int dwAvgBytesPerSec;
+	unsigned short wBlockAlign;
+	unsigned short wBitsPerSample;
 	// Note: there may be additional fields here, depending upon wFormatTag
 } FORMAT;
 #pragma pack()
-
-
 
 // Size of the audio card hardware buffer. Here we want it
 // set to 1024 16-bit sample points. This is relatively
@@ -55,54 +54,50 @@ typedef struct _FORMAT {
 // with underruns, you may need to increase this, and PERIODSIZE
 // (trading off lower latency for more stability)
 //#define BUFFERSIZE	(2*1024)
-#define BUFFERSIZE	(2*16)
+#define BUFFERSIZE (2 * 16)
 
 // How many sample points the ALSA card plays before it calls
 // our callback to fill some more of the audio card's hardware
 // buffer. Here we want ALSA to call our callback after every
 // 64 sample points have been played
-#define PERIODSIZE	(2*4)
+#define PERIODSIZE (2 * 4)
 
 // Handle to ALSA (audio card's) playback port
-snd_pcm_t* PlaybackHandle;
+snd_pcm_t *PlaybackHandle;
 
-snd_pcm_hw_params_t* params;
+snd_pcm_hw_params_t *params;
 
 // Handle to our callback thread
-snd_async_handler_t* CallbackHandle;
+snd_async_handler_t *CallbackHandle;
 
 // Points to loaded WAVE file's data
-unsigned char* WavePtr;
+unsigned char *WavePtr;
 
 // Size (in frames) of loaded WAVE file's data
-snd_pcm_uframes_t		WaveSize;
+snd_pcm_uframes_t WaveSize;
 
 snd_pcm_uframes_t paramFrames;
 
 // Sample rate
-unsigned short			WaveRate;
+unsigned short WaveRate;
 
 // Bit resolution
-unsigned char			WaveBits;
+unsigned char WaveBits;
 
 // Number of channels in the wave file
-unsigned char			WaveChannels;
+unsigned char WaveChannels;
 
 // The name of the ALSA port we output to. In this case, we're
 // directly writing to hardware card 0,0 (ie, first set of audio
 // outputs on the first audio card)
-//static const char		SoundCardPortName[] = "plughw:1,0";
-static const char		SoundCardPortName[] = "plughw:1,0";
+// static const char		SoundCardPortName[] = "plughw:1,0";
+static const char SoundCardPortName[] = "plughw:1,0";
 
 // For WAVE file loading
-static const unsigned char Riff[4] = { 'R', 'I', 'F', 'F' };
-static const unsigned char Wave[4] = { 'W', 'A', 'V', 'E' };
-static const unsigned char Fmt[4] = { 'f', 'm', 't', ' ' };
-static const unsigned char Data[4] = { 'd', 'a', 't', 'a' };
-
-
-
-
+static const unsigned char Riff[4] = {'R', 'I', 'F', 'F'};
+static const unsigned char Wave[4] = {'W', 'A', 'V', 'E'};
+static const unsigned char Fmt[4] = {'f', 'm', 't', ' '};
+static const unsigned char Data[4] = {'d', 'a', 't', 'a'};
 
 /********************** compareID() *********************
  * Compares the passed ID str (ie, a ptr to 4 Ascii
@@ -111,20 +106,17 @@ static const unsigned char Data[4] = { 'd', 'a', 't', 'a' };
  * a match, FALSE if not.
  */
 
-static unsigned char compareID(const unsigned char* id, unsigned char* ptr)
+static unsigned char compareID(const unsigned char *id, unsigned char *ptr)
 {
 	register unsigned char i = 4;
 
 	while (i--)
 	{
-		if (*(id)++ != *(ptr)++) return(0);
+		if (*(id)++ != *(ptr)++)
+			return (0);
 	}
-	return(1);
+	return (1);
 }
-
-
-
-
 
 /********************** waveLoad() *********************
  * Loads a WAVE file.
@@ -138,11 +130,11 @@ static unsigned char compareID(const unsigned char* id, unsigned char* ptr)
  * in sample points.
  */
 
-static unsigned char waveLoad(const char* fn)
+static unsigned char waveLoad(const char *fn)
 {
-	const char* message;
-	FILE_head				head;
-	register int			inHandle;
+	const char *message;
+	FILE_head head;
+	register int inHandle;
 
 	if ((inHandle = open(fn, O_RDONLY)) == -1)
 		message = "didn't open";
@@ -168,10 +160,11 @@ static unsigned char waveLoad(const char* fn)
 				// ============================ Is it a fmt chunk? ===============================
 				if (compareID(&Fmt[0], &head.ID[0]))
 				{
-					FORMAT	format;
+					FORMAT format;
 
 					// Read in the remainder of chunk
-					if (read(inHandle, &format.wFormatTag, sizeof(FORMAT)) != sizeof(FORMAT)) break;
+					if (read(inHandle, &format.wFormatTag, sizeof(FORMAT)) != sizeof(FORMAT))
+						break;
 
 					// Can't handle compressed WAVE files
 					if (format.wFormatTag != 1)
@@ -190,7 +183,7 @@ static unsigned char waveLoad(const char* fn)
 				{
 					// Size of wave data is head.Length. Allocate a buffer and read in the wave data
 					cout << "mallocSize: " << head.Length << endl;
-					if (!(WavePtr = (unsigned char*)malloc(head.Length)))
+					if (!(WavePtr = (unsigned char *)malloc(head.Length)))
 					{
 						message = "won't fit in RAM";
 						goto bad;
@@ -202,44 +195,37 @@ static unsigned char waveLoad(const char* fn)
 						break;
 					}
 
-					//cout << "wavLoaded " << endl;
-					//for (int i = 0; i < head.Length; i++) {
+					// cout << "wavLoaded " << endl;
+					// for (int i = 0; i < head.Length; i++) {
 					//	cout << (int)WavePtr[i] << " ";
 					//	if(i % 16 == 15) cout << endl;
-					//}
+					// }
 
 					// Store size (in frames)
 					WaveSize = (head.Length * 8) / ((unsigned int)WaveBits * (unsigned int)WaveChannels);
 
 					close(inHandle);
-					return(0);
+					return (0);
 				}
 
 				// ============================ Skip this chunk ===============================
 				else
 				{
-					if (head.Length & 1) ++head.Length;  // If odd, round it up to account for pad byte
+					if (head.Length & 1)
+						++head.Length; // If odd, round it up to account for pad byte
 					lseek(inHandle, head.Length, SEEK_CUR);
 				}
 			}
 		}
 
 		message = "is a bad WAVE file";
-	bad:	close(inHandle);
+	bad:
+		close(inHandle);
 	}
 
 	printf("%s %s\n", fn, message);
-	return(1);
+	return (1);
 }
-
-
-
-
-
-
-
-
-
 
 /********************** play_audio() **********************
  * Plays the loaded waveform.
@@ -251,17 +237,19 @@ static unsigned char waveLoad(const char* fn)
 
 static void play_audio(void)
 {
-	register snd_pcm_uframes_t		count, frames;
+	register snd_pcm_uframes_t count, frames;
 	// Output the wave data
 	count = 0;
 	bool playState = true;
+
 	do
 	{
 		int nFrame = 1000; // n frame will be play for this loop turn
-		if ((int)WaveSize - (int)count < nFrame) { //if the rest of the wave is less than nFrame, then play the rest of the wave
+		if ((int)WaveSize - (int)count < nFrame)
+		{ // if the rest of the wave is less than nFrame, then play the rest of the wave
 			nFrame = (int)WaveSize - (int)count;
 		}
-		frames = snd_pcm_writei(PlaybackHandle, WavePtr + 2 * count, nFrame); //play nFrame of the Wave
+		frames = snd_pcm_writei(PlaybackHandle, WavePtr + 2 * count, nFrame); // play nFrame of the Wave
 		// If an error, try to recover from it
 		if (frames < 0)
 			frames = snd_pcm_recover(PlaybackHandle, frames, 0);
@@ -272,41 +260,40 @@ static void play_audio(void)
 		}
 		// Update our pointer
 		count += frames;
-		cout << "count: " << count << endl;
+		//cout << "count: " << count << endl;
 
 		bool state[3];
 
-
 		readButtonsStates(buttons, state);
 
-		if (state[B_OK] == false) {
+		if (state[B_OK] == false)
+		{
 			playState = false;
-			while (state[B_OK] == false) {
+			while (state[B_OK] == false)
+			{
 				readButtonsStates(buttons, state);
 			}
 		}
-
-		cout << "playState: " << playState << endl;
-		while (playState == false) {
+		while (playState == false)
+		{
 			readButtonsStates(buttons, state);
-			if (state[B_OK] == false) {
+			if (state[B_OK] == false)
+			{
 				playState = true;
-				while (state[B_OK] == false) {
+				while (state[B_OK] == false)
+				{
 					readButtonsStates(buttons, state);
 				}
 			}
 		}
-
-
+		updatePlayingDisplay(count, WaveSize, WaveRate);
 	} while (count < WaveSize);
 	// Wait for playback to completely finish
 	if (count == WaveSize)
 		snd_pcm_drain(PlaybackHandle);
+		updatePlayingDisplay(count, WaveSize, WaveRate);
+
 }
-
-
-
-
 
 /*********************** free_wave_data() *********************
  * Frees any wave data we loaded.
@@ -317,25 +304,23 @@ static void play_audio(void)
 
 static void free_wave_data(void)
 {
-	if (WavePtr) free(WavePtr);
+	if (WavePtr)
+		free(WavePtr);
 	WavePtr = 0;
 }
-
-
-
-
 
 void alsa_play(char path[])
 {
 
-	system("amixer set Headphone unmuted 50%");
+	// system("amixer set Headphone unmuted 50%");
 
 	// No wave data loaded yet
 	WavePtr = 0;
 
 	// Load the wave file
-	if (!waveLoad(path)) {
-		register int		err;
+	if (!waveLoad(path))
+	{
+		register int err;
 
 		// Open audio card we wish to use for playback
 		if ((err = snd_pcm_open(&PlaybackHandle, &SoundCardPortName[0], SND_PCM_STREAM_PLAYBACK, 0)) < 0)
@@ -362,12 +347,13 @@ void alsa_play(char path[])
 			}
 
 			// Set the audio card's hardware parameters (sample rate, bit resolution, etc)
-//			snd_pcm_hw_params(PlaybackHandle, )
+			//			snd_pcm_hw_params(PlaybackHandle, )
 			if ((err = snd_pcm_set_params(PlaybackHandle, (snd_pcm_format_t)err, SND_PCM_ACCESS_RW_INTERLEAVED, WaveChannels, WaveRate, 1, 500000)) < 0)
 				printf("Can't set sound parameters: %s\n", snd_strerror(err));
 
 			// Play the waveform
-			else {
+			else
+			{
 
 				/*int dir;
 				snd_pcm_hw_params_alloca(&params);

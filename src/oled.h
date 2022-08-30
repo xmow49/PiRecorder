@@ -18,3 +18,5 @@ void printMenuTitle(char* text);
 
 unsigned int printPlayList(std::vector<string> newFiles, unsigned char action);
 void printPlay(std::vector<string> files, string recordsPath, unsigned int index);
+
+void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate);

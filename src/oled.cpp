@@ -201,14 +201,19 @@ unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 
 	OLED.print(">");
 
-	OLED.setCursor(10, 10);
-	OLED.print(files[index + 1].c_str());
-
-	OLED.setCursor(10, 20);
-	OLED.print(files[index + 2].c_str());
-
+	if (files.size() > 1)
+	{
+		OLED.setCursor(10, 10);
+		OLED.print(files[index + 1].c_str());
+	}
+	if (files.size() > 2)
+	{
+		OLED.setCursor(10, 20);
+		OLED.print(files[index + 2].c_str());
+	}
 	OLED.OLEDupdate();
-	if(maxDOWN){
+	if (maxDOWN)
+	{
 		return index;
 	}
 	return index + 1;
@@ -223,4 +228,34 @@ void printPlay(std::vector<string> files, string recordsPath, unsigned int index
 	OLED.setCursor(0, 0);
 	OLED.print(files[index].c_str());
 	OLED.OLEDupdate();
+}
+
+string secToMMSS(int sec)
+{
+	int minutes = sec / 60;
+	int seconds = sec - minutes * 60;
+	char text[5];
+	sprintf(text, "%02d:%02d", minutes, seconds);
+	return text;
+}
+
+void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate)
+{
+	static time_t nextRefreshTime = 0;
+
+	if (nextRefreshTime < time(NULL))
+	{
+		nextRefreshTime = time(NULL);
+		OLED.OLEDclearBuffer();
+
+		OLED.setCursor(0, 25);
+		OLED.print(secToMMSS(currentFrame / sampleRate).c_str());
+
+		OLED.setCursor(97, 25);
+		OLED.print(secToMMSS(totalFrame / sampleRate).c_str());
+
+		OLED.drawRoundRect(32, 25, 62, 7, 2, WHITE);
+		OLED.fillRoundRect(32, 25, (currentFrame * 62) / totalFrame, 7, 2, WHITE);
+		OLED.OLEDupdate();
+	}
 }

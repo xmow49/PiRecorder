@@ -256,7 +256,7 @@ void stopProgram(int signal_number)
 
 struct Display
 {
-	char menu = 1;
+	char menu = MENU_RECORD;
 	bool active = true;
 };
 
@@ -317,6 +317,10 @@ int main(int argc, char **argv)
 				cout << "LONG PRESS END" << endl;
 				longPressRefresh = true;
 				longPressStatus = false;
+				if(display.menu == MENU_PLAY)
+				{
+					display.menu = MENU_RECLIST;
+				}
 				display.active = !display.active;
 
 				cout << "LongPress : active : " << display.active << endl;
@@ -403,9 +407,10 @@ int main(int argc, char **argv)
 								printPlay(files, recordPath, index);
 
 								string currentPlayingFile = recordPath + files[index];
+								cout << currentPlayingFile << endl;
 								int size = currentPlayingFile.length();
 								char path[size + 1];
-								strcpy(path, currentFilename.c_str());
+								strcpy(path, currentPlayingFile.c_str());
 								alsa_play(path);
 								break;
 							}
