@@ -235,7 +235,7 @@ static unsigned char waveLoad(const char *fn)
  * the global "WavePtr", and its size of "WaveSize".
  */
 
-static void play_audio(void)
+static void play_audio()
 {
 	register snd_pcm_uframes_t count, frames;
 	// Output the wave data
@@ -260,7 +260,7 @@ static void play_audio(void)
 		}
 		// Update our pointer
 		count += frames;
-		//cout << "count: " << count << endl;
+		// cout << "count: " << count << endl;
 
 		bool state[3];
 
@@ -274,8 +274,25 @@ static void play_audio(void)
 				readButtonsStates(buttons, state);
 			}
 		}
+		else if (state[B_RIGHT] == false)
+		{
+			count += 5 * WaveRate; // add 5 seconds to the count
+			while (state[B_RIGHT] == false)
+			{
+				readButtonsStates(buttons, state);
+			}
+		}
+		else if (state[B_LEFT] == false)
+		{
+			count -= 5 * WaveRate; // sub 5 seconds to the count
+			while (state[B_LEFT] == false)
+			{
+				readButtonsStates(buttons, state);
+			}
+		}
 		while (playState == false)
 		{
+			updatePlayingDisplay(count, WaveSize, WaveRate, playState);
 			readButtonsStates(buttons, state);
 			if (state[B_OK] == false)
 			{
@@ -286,13 +303,12 @@ static void play_audio(void)
 				}
 			}
 		}
-		updatePlayingDisplay(count, WaveSize, WaveRate);
+		updatePlayingDisplay(count, WaveSize, WaveRate, playState);
 	} while (count < WaveSize);
 	// Wait for playback to completely finish
 	if (count == WaveSize)
 		snd_pcm_drain(PlaybackHandle);
-		updatePlayingDisplay(count, WaveSize, WaveRate);
-
+	updatePlayingDisplay(WaveSize, WaveSize, WaveRate, false);
 }
 
 /*********************** free_wave_data() *********************

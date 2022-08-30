@@ -219,8 +219,11 @@ unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 	return index + 1;
 }
 
+string currentPlayingFile = "";
+
 void printPlay(std::vector<string> files, string recordsPath, unsigned int index)
 {
+	currentPlayingFile = files[index];
 	string path = recordsPath + files[index];
 
 	OLED.OLEDclearBuffer();
@@ -239,7 +242,9 @@ string secToMMSS(int sec)
 	return text;
 }
 
-void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate)
+
+
+void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate, bool playingState)
 {
 	static time_t nextRefreshTime = 0;
 
@@ -248,6 +253,20 @@ void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t s
 		nextRefreshTime = time(NULL);
 		OLED.OLEDclearBuffer();
 
+		OLED.setCursor(30, 0);
+		OLED.print(currentPlayingFile.c_str());
+
+		if(playingState)
+		{
+			OLED.setCursor(55, 10);
+			OLED.print("||");
+		}
+		else
+		{
+			OLED.drawTriangle(55, 10, 55, 20, 65, 15, WHITE);
+		}
+
+		
 		OLED.setCursor(0, 25);
 		OLED.print(secToMMSS(currentFrame / sampleRate).c_str());
 

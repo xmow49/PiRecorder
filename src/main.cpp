@@ -317,7 +317,7 @@ int main(int argc, char **argv)
 				cout << "LONG PRESS END" << endl;
 				longPressRefresh = true;
 				longPressStatus = false;
-				if(display.menu == MENU_PLAY)
+				if (display.menu == MENU_PLAY)
 				{
 					display.menu = MENU_RECLIST;
 				}
@@ -391,11 +391,11 @@ int main(int argc, char **argv)
 							}
 							case MENU_INFO:
 							{
-								string ip = "IP:" + getIPAddress();
-								long long used, size;
-								readSpace(recordPath, &used, &size);
-								cout << used << "/" << size << endl;
-								printInfo(ip, used, size);
+								// string ip = "IP:" + getIPAddress();
+								// long long used, size;
+								// readSpace(recordPath, &used, &size);
+								// cout << used << "/" << size << endl;
+								// printInfo(ip, used, size);
 								break;
 							}
 							case MENU_RECLIST:
@@ -403,8 +403,8 @@ int main(int argc, char **argv)
 								display.menu = MENU_PLAY;
 								vector<string> files = getFiles(recordPath);
 								vector<string> tmp;
-								unsigned int index = printPlayList(tmp, '\0');
-								printPlay(files, recordPath, index);
+								unsigned int index = printPlayList(tmp, '\0'); //get selected file
+								printPlay(files, recordPath, index); 
 
 								string currentPlayingFile = recordPath + files[index];
 								cout << currentPlayingFile << endl;
@@ -426,25 +426,28 @@ int main(int argc, char **argv)
 								display.active = !display.active;
 
 							// on change menue
-							switch (display.menu)
+							if (display.active)
 							{
-							case MENU_RECORD:
-								break;
-							case MENU_INFO:
-							{
-								string ip = "IP:" + getIPAddress();
-								long long used, size;
-								readSpace(recordPath, &used, &size);
-								cout << used << "/" << size << endl;
-								printInfo(ip, used, size);
-								break;
-							}
-							case MENU_RECLIST:
-							{
-								vector<string> files = getFiles(recordPath);
-								printPlayList(files, 1);
-								break;
-							}
+								switch (display.menu)
+								{
+								case MENU_RECORD:
+									break;
+								case MENU_INFO:
+								{
+									string ip = "IP:" + getIPAddress();
+									long long used, size;
+									readSpace(recordPath, &used, &size);
+									cout << used << "/" << size << endl;
+									printInfo(ip, used, size);
+									break;
+								}
+								case MENU_RECLIST:
+								{
+									vector<string> files = getFiles(recordPath);
+									printPlayList(files, 1);
+									break;
+								}
+								}
 							}
 						}
 
@@ -514,7 +517,6 @@ int main(int argc, char **argv)
 		case MENU_RECLIST:
 			if (display.active)
 			{
-
 			}
 			else
 			{
@@ -524,8 +526,7 @@ int main(int argc, char **argv)
 			if (display.active)
 			{
 				// printPlay("R000001.wav", "R000002.wav", "R000003.wav");
-				//printPlay(files, recordPath, index);
-				
+				// printPlay(files, recordPath, index);
 			}
 			else
 			{
