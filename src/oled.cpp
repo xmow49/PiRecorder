@@ -149,24 +149,23 @@ string humanReadable(long long size)
 	return to_string(size) + suffixes[i];
 }
 
-void printMenuTitle(char *text)
+void printMenuTitle(string text)
 {
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(2);
 	OLED.setCursor(20, 13);
-	OLED.print(text);
+	OLED.print(text.c_str());
 	OLED.OLEDupdate();
 }
 
 unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 {
 	static std::vector<string> files;
-	static unsigned int index = 1;
+	static unsigned int index = 0;
+	static bool maxDOWN = 1;
 	if (newFiles.size() != 0)
 		files = newFiles;
 
-	static bool maxDOWN = 0;
-	int toto = files.size();
 	switch (action)
 	{
 	case 'U':
@@ -187,6 +186,15 @@ unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 
 	OLED.OLEDclearBuffer();
 	OLED.setTextSize(1);
+
+	if (files.size() == 0)
+	{
+		OLED.setCursor(20, 15);
+		OLED.print("Aucun fichier");
+		OLED.OLEDupdate();
+		return 0;
+	}
+
 	OLED.setCursor(10, 0);
 	OLED.print(files[index].c_str());
 
@@ -200,7 +208,6 @@ unsigned int printPlayList(std::vector<string> newFiles, unsigned char action)
 	}
 
 	OLED.print(">");
-
 	if (files.size() > 1)
 	{
 		OLED.setCursor(10, 10);
@@ -235,20 +242,18 @@ void printPlay(std::vector<string> files, string recordsPath, unsigned int index
 
 string secToMMSS(int sec)
 {
-	int minutes = sec / 60;
-	int seconds = sec - minutes * 60;
-	char text[5];
+	char minutes = sec / 60;
+	char seconds = sec - minutes * 60;
+	char text[7];
 	sprintf(text, "%02d:%02d", minutes, seconds);
 	return text;
 }
 
-
-
-void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate, bool playingState)
+void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate, bool playingState, bool instantRefresh)
 {
 	static time_t nextRefreshTime = 0;
 
-	if (nextRefreshTime < time(NULL))
+	if ((nextRefreshTime < time(NULL)) || instantRefresh)
 	{
 		nextRefreshTime = time(NULL);
 		OLED.OLEDclearBuffer();
@@ -256,7 +261,7 @@ void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t s
 		OLED.setCursor(30, 0);
 		OLED.print(currentPlayingFile.c_str());
 
-		if(playingState)
+		if (playingState)
 		{
 			OLED.setCursor(55, 10);
 			OLED.print("||");
@@ -266,7 +271,6 @@ void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t s
 			OLED.drawTriangle(55, 10, 55, 20, 65, 15, WHITE);
 		}
 
-		
 		OLED.setCursor(0, 25);
 		OLED.print(secToMMSS(currentFrame / sampleRate).c_str());
 

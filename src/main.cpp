@@ -305,6 +305,7 @@ int main(int argc, char **argv)
 	time_t startPushTime = time(nullptr);
 	bool longPressRefresh = false;
 	bool longPressStatus = false;
+
 	while (mainLoop)
 	{
 		readButtonsStates(buttons, buttonsStates);
@@ -319,6 +320,7 @@ int main(int argc, char **argv)
 				longPressStatus = false;
 				if (display.menu == MENU_PLAY)
 				{
+					stopAudioThread();
 					display.menu = MENU_RECLIST;
 				}
 				display.active = !display.active;
@@ -403,15 +405,18 @@ int main(int argc, char **argv)
 								display.menu = MENU_PLAY;
 								vector<string> files = getFiles(recordPath);
 								vector<string> tmp;
-								unsigned int index = printPlayList(tmp, '\0'); //get selected file
-								printPlay(files, recordPath, index); 
+								unsigned int index = printPlayList(tmp, '\0'); // get selected file
+								if (files.size() > 0)
+								{
+									printPlay(files, recordPath, index);
+									string currentPlayingFile = recordPath + files[index];
+									cout << currentPlayingFile << endl;
+									int size = currentPlayingFile.length();
+									char path[size + 1];
+									strcpy(path, currentPlayingFile.c_str());
+									createAudioThread(path);
+								}
 
-								string currentPlayingFile = recordPath + files[index];
-								cout << currentPlayingFile << endl;
-								int size = currentPlayingFile.length();
-								char path[size + 1];
-								strcpy(path, currentPlayingFile.c_str());
-								alsa_play(path);
 								break;
 							}
 							default:

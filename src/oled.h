@@ -14,9 +14,9 @@ string humanReadable(long long size);
 void printSoundCardError();
 void printSoundCardRetry();
 
-void printMenuTitle(char* text);
+void printMenuTitle(string text);
 
 unsigned int printPlayList(std::vector<string> newFiles, unsigned char action);
 void printPlay(std::vector<string> files, string recordsPath, unsigned int index);
 
-void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate, bool playingState);
+void updatePlayingDisplay(uint32_t currentFrame, uint32_t totalFrame, uint32_t sampleRate, bool playingState, bool instantRefresh);

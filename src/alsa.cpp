@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <bcm2835.h>
+#include <thread>
 
 // Include the ALSA .H file that defines ALSA functions/data
 #include <alsa/asoundlib.h>
@@ -106,7 +107,7 @@ static const unsigned char Data[4] = {'d', 'a', 't', 'a'};
  * a match, FALSE if not.
  */
 
-static unsigned char compareID(const unsigned char *id, unsigned char *ptr)
+unsigned char compareID(const unsigned char *id, unsigned char *ptr)
 {
 	register unsigned char i = 4;
 
@@ -130,7 +131,7 @@ static unsigned char compareID(const unsigned char *id, unsigned char *ptr)
  * in sample points.
  */
 
-static unsigned char waveLoad(const char *fn)
+unsigned char waveLoad(const char *fn)
 {
 	const char *message;
 	FILE_head head;
@@ -189,7 +190,7 @@ static unsigned char waveLoad(const char *fn)
 						goto bad;
 					}
 
-					if (read(inHandle, WavePtr, head.Length) != head.Length)
+					if (read(inHandle, WavePtr, head.Length) != (int)head.Length)
 					{
 						free(WavePtr);
 						break;
@@ -235,7 +236,10 @@ static unsigned char waveLoad(const char *fn)
  * the global "WavePtr", and its size of "WaveSize".
  */
 
-static void play_audio()
+bool stopPlaying = false;
+
+
+void play_audio()
 {
 	register snd_pcm_uframes_t count, frames;
 	// Output the wave data
@@ -269,6 +273,7 @@ static void play_audio()
 		if (state[B_OK] == false)
 		{
 			playState = false;
+			updatePlayingDisplay(count, WaveSize, WaveRate, playState, true);
 			while (state[B_OK] == false)
 			{
 				readButtonsStates(buttons, state);
@@ -292,7 +297,6 @@ static void play_audio()
 		}
 		while (playState == false)
 		{
-			updatePlayingDisplay(count, WaveSize, WaveRate, playState);
 			readButtonsStates(buttons, state);
 			if (state[B_OK] == false)
 			{
@@ -301,14 +305,17 @@ static void play_audio()
 				{
 					readButtonsStates(buttons, state);
 				}
+				updatePlayingDisplay(count, WaveSize, WaveRate, playState, true);
 			}
 		}
-		updatePlayingDisplay(count, WaveSize, WaveRate, playState);
-	} while (count < WaveSize);
+		updatePlayingDisplay(count, WaveSize, WaveRate, playState, false);
+	} while ((count < WaveSize) && !stopPlaying);
 	// Wait for playback to completely finish
 	if (count == WaveSize)
 		snd_pcm_drain(PlaybackHandle);
-	updatePlayingDisplay(WaveSize, WaveSize, WaveRate, false);
+
+	playState = false;
+	updatePlayingDisplay(WaveSize, WaveSize, WaveRate, true, true);
 }
 
 /*********************** free_wave_data() *********************
@@ -318,7 +325,7 @@ static void play_audio()
  * "WavePtr".
  */
 
-static void free_wave_data(void)
+void free_wave_data(void)
 {
 	if (WavePtr)
 		free(WavePtr);
@@ -393,4 +400,19 @@ void alsa_play(char path[])
 
 	// Free the WAVE data
 	free_wave_data();
+}
+
+thread playThread;
+
+void createAudioThread(char *path)
+{
+	static char playingPath[100];
+	strcpy(playingPath, path);
+	stopPlaying = false;
+	playThread = thread(alsa_play, playingPath);
+}
+
+void stopAudioThread(){
+	stopPlaying = true;
+	playThread.join();
 }
